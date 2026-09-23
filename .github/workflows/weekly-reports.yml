@@ -1,0 +1,43 @@
+name: Weekly reports
+
+# Calls POST /internal/jobs/weekly-reports every Sunday 00:05 PHT (Saturday 16:05 UTC), plan §5.5.
+# The API also runs the job in-process and generates reports lazily on read; this cron covers hosts that
+# scale to zero. It is idempotent, so running it alongside the in-process job is safe.
+#
+# DISABLED until hosting is decided: it only runs when the repository variable WEEKLY_REPORTS_ENABLED is 'true'.
+# To enable it, set these in Settings → Secrets and variables → Actions:
+#   variables: WEEKLY_REPORTS_ENABLED=true, API_BASE_URL=https://<prod host>   (no trailing slash)
+#   secrets:   JOB_KEY (same value as the API's JOB_KEY env var)
+
+on:
+  schedule:
+    - cron: '5 16 * * 6'
+  workflow_dispatch:
+    inputs:
+      weekStart:
+        description: 'Week to generate (a Sunday, YYYY-MM-DD). Empty = the week that just closed.'
+        required: false
+        default: ''
+
+permissions: {}
+
+jobs:
+  trigger:
+    if: ${{ vars.WEEKLY_REPORTS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Generate missing weekly reports
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          JOB_KEY: ${{ secrets.JOB_KEY }}
+          WEEK_START: ${{ inputs.weekStart }}
+        run: |
+          if [ -n "$WEEK_START" ]; then body="{\"weekStart\":\"$WEEK_START\"}"; else body=""; fi
+          # Retries cover a cold start on scale-to-zero hosts.
+          curl --fail-with-body --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 20 --max-time 600 \
+            -X POST "$API_BASE_URL/internal/jobs/weekly-reports" \
+            -H "X-Job-Key: $JOB_KEY" \
+            -H "Content-Type: application/json" \
+            --data "$body"

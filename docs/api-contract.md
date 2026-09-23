@@ -122,3 +122,32 @@ Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone"
 - Every response carries `X-Request-Id`.
 - Clients may send their own `X-Request-Id` (1–64 letters, digits, `-` or `_`), and the server echoes it back. Anything else is replaced with a server-generated UUID, and the request is never rejected because of it.
 - Include the ID in bug reports.
+
+### 5.7 Reports (BE-3)
+Added 2026-09-23 by BE-3. These fill gaps in §3 and don't change its shape.
+
+- `GET /v1/reports` returns a bare JSON array (newest first), exactly as in §2. It is `[]` when there are no reports.
+- `isLatest` is `true` only for the report whose `weekStart` is the current week's start minus 7 days. Only that report accepts adoptions (plan I7).
+- `GET /v1/reports/{weekStart}`:
+  - `weekStart` must be a Sunday in `YYYY-MM-DD` format. Otherwise the response is `400 VALIDATION_FAILED` with `details.field = "weekStart"`.
+  - `404 NOT_FOUND` when the week is still open, when the user logged nothing that week, or when the report would belong to someone else.
+  - A missing report for a closed week that has entries is generated before responding.
+- `stats` (plan §5.1):
+  - `categories` always lists the three analyzed categories in the order `BIODEGRADABLE`, `RECYCLABLE`, `RESIDUAL`, including those with zero entries. `sharePct` is `0.0` when nothing analyzed was logged.
+  - `subcategories` lists only analyzed subcategories with at least one entry, ordered by quantity (desc), then frequency (desc), then code.
+  - SPECIAL waste appears only in `special`.
+- `hotspots` (plan §5.2): at most 3, ordered by `rank`. `criteria` holds `MOST_FREQUENT`, `HIGHEST_QUANTITY`, and `AVOIDABLE`, in that order. `score` has at most 4 decimals. The list is empty for a week with only SPECIAL waste. `recommendations` (1–3, ordered by rank) may be empty if no curated item could be picked.
+- `comparison` (plan §5.3) is `null` when the previous week has no analyzed entries. Otherwise the rows are:
+  - `total: {previous, current, delta, deltaPct, trend}`
+  - `categories: [{category, previous, current, delta, deltaPct, trend}]`: all three analyzed categories, in the same order as `stats`.
+  - `subcategories: [{code, category, previous, current, delta, deltaPct, trend}]`: every analyzed subcategory present in either week, ordered by code.
+  - All values are quantities (pieces). `deltaPct` is rounded to 1 decimal (half away from zero) and is `null` when `previous` is 0. `trend` is `DECREASED`, `SAME`, or `INCREASED`.
+- `impacts` (plan §5.4) lists the interventions adopted on the previous week's report, measured in this week, ordered by `targetSubcategory` and then intervention code. `baselineQuantity` is the value stored at adoption time. `followupQuantity` is `0` when the target wasn't logged this week.
+  - If nothing at all was logged the following week, there is no following report and no impact rows exist. In that case the client shows "Not measured" on the adopted cards of the earlier report once that following week has closed.
+- `revision` starts at 1 and increases each time a late offline sync regenerates the report (plan §5.6). Regeneration keeps adoptions and the recommendations of hotspots that still exist. A hotspot that is no longer in the top 3 is removed along with its recommendations, but adoptions of its interventions are kept and still measured.
+- The same rules are implemented for offline reports on Android and are pinned by `docs/analytics-test-vectors.json`.
+
+### 5.8 `POST /internal/jobs/weekly-reports`
+- Header `X-Job-Key` must equal the server's `JOB_KEY`. If it is missing or wrong, the response is `401 UNAUTHENTICATED`. If the server has no `JOB_KEY` configured, the endpoint returns `404 NOT_FOUND`.
+- The body is optional: `{"weekStart":"YYYY-MM-DD"}`. An empty body means the week that just closed. A `weekStart` that isn't a Sunday, or whose week hasn't closed yet, returns `400 VALIDATION_FAILED`.
+- The response is `200 {"weekStart":"2026-09-27","created":12}`. The job is idempotent: it only creates reports that are missing.
