@@ -1,0 +1,124 @@
+# Menosan API contract — v1
+
+> **Status:** v1, **frozen 2026-09-23** at the end of BE-0. Canonical copy of `docs/DEVELOPMENT_PLAN.md` §8, plus the clarifications in §5 below.
+> Android (`menosan-android`) builds against this file. Changes follow §4 and must be logged in `docs/CHANGELOG-contract.md`.
+
+---
+
+## 1. Conventions
+
+- Base path `/v1`. JSON uses camelCase. Dates are `YYYY-MM-DD` (Manila local dates). Instants are ISO-8601 UTC (`2026-09-27T02:15:00Z`).
+- Auth: `Authorization: Bearer <Firebase ID token>` on every `/v1` route except `/v1/taxonomy`. An invalid or expired token returns `401 UNAUTHENTICATED`. A valid token with no Menosan account returns `404 ACCOUNT_NOT_FOUND` on every route except `POST /v1/account` (SFR2.2).
+- Every query is scoped by the authenticated `user_id` (NFR2, NFR6). Accessing another user's resource returns `404` (never `403`, so existence doesn't leak).
+- Errors: `{"error": {"code": "WEEK_CLOSED", "message": "Human readable", "details": {}}}`.
+- Error codes: `UNAUTHENTICATED`, `ACCOUNT_NOT_FOUND`, `VALIDATION_FAILED`, `INVALID_TIMESTAMP`, `WEEK_CLOSED`, `NOT_FOUND`, `CONFLICT`, `ADOPTION_WINDOW_CLOSED`, `ANALYSIS_FAILED`, `NOT_WASTE`, `IMAGE_TOO_LARGE`, `RATE_LIMITED`, `INTERNAL`.
+
+## 2. Endpoints
+
+| Method & path | Purpose | Req |
+|---|---|---|
+| `GET /health` | Liveness plus a DB check. No auth. | — |
+| `GET /v1/taxonomy` | Categories and subcategories (plan §3). | SFR5.1 |
+| `GET /v1/me` | `200 {id,email,displayName,createdAt}` or `404 ACCOUNT_NOT_FOUND`. | SFR2.1–2.2 |
+| `POST /v1/account` | Body `{consent: true}`. Creates and links the account from the verified token (idempotent: returns `200` if it exists, `201` if created). | SFR1.1–1.2 |
+| `DELETE /v1/account` | Deletes all data and the Firebase user. Returns `204`. | SFR4.1–4.2, NFR4 |
+| `GET /v1/export` | Full JSON export (profile, entries, reports, hotspots, comparisons, recommendations, adoptions, impacts). | NFR16 |
+| `GET /v1/weeks/current` | `{weekStart, weekEnd, timezone:"Asia/Manila", serverNow}`. | SFR10.3 |
+| `GET /v1/entries?weekStart=` | Entries for a week (default: current), newest first. | SFR10.1–10.2 |
+| `PUT /v1/entries/{id}` | Create or update (idempotent upsert). Body `{name, subcategory, quantity, source, createdAt}`. The server derives `category` and `weekStart`. Create returns `201`, update `200`. Updates may not change `createdAt`. | SFR5, SFR6, SFR11 |
+| `DELETE /v1/entries/{id}` | Returns `204`, also when the entry is already gone (idempotent). `409 WEEK_CLOSED` if the entry's week is closed. | SFR11.2–11.3 |
+| `POST /v1/entries/sync` | Batch for the offline outbox: `{upserts:[EntryPut & {id}], deletes:[id]}` → `{results:[{id, status:"OK"\|"WEEK_CLOSED"\|"INVALID"\|..., entry?}]}`. Items are processed independently, and the batch never fails as a whole because of one item. | SFR6.3–6.4, NFR8 |
+| `POST /v1/photo-analysis` | `multipart/form-data`, field `image` (JPEG, ≤ 2 MB). Returns `200 {suggestion:{name, category, subcategory, quantity, confidence}, warning}`. Also `422 ANALYSIS_FAILED`, `422 NOT_WASTE`, `413 IMAGE_TOO_LARGE`, `429 RATE_LIMITED` (30 per user per day). Nothing is stored. | SFR7–8, SFR9.5 |
+| `GET /v1/reports` | List `[ {weekStart, weekEnd, analyzedQuantity, hotspotCount, adoptedCount, isLatest} ]`, newest first. Runs lazy catch-up first. | SFR12.1, SFR18.2 |
+| `GET /v1/reports/{weekStart}` | Full report (§3). | SFR12–17 |
+| `POST /v1/reports/{weekStart}/adoptions` | `{interventionIds:[uuid]}` → the updated report. `409 ADOPTION_WINDOW_CLOSED` if the report is not the latest. | SFR16 |
+| `DELETE /v1/reports/{weekStart}/adoptions/{interventionId}` | Un-adopt within the window. | SFR16 |
+| `POST /internal/jobs/weekly-reports` | Header `X-Job-Key`. Optional `{weekStart}`. Generates missing reports. | SFR12.1 |
+| `POST /internal/dev/*` | **Only when `DEV_TOOLS_ENABLED=true` (never in prod):** `clock` (set or clear override), `seed-history {email, weeks:3}` (synthetic entries in past weeks, then report generation), `reports/generate {email, weekStart}`. | testing |
+
+## 3. Report payload (shape)
+
+```json
+{
+  "weekStart": "2026-09-27", "weekEnd": "2026-10-03", "revision": 1, "isLatest": true,
+  "stats": {
+    "analyzedTotals": {"frequency": 42, "quantity": 118},
+    "categories": [{"category": "RESIDUAL", "frequency": 20, "quantity": 70, "sharePct": 59.3}],
+    "subcategories": [{"code": "RES_SACHETS", "category": "RESIDUAL", "frequency": 12, "quantity": 40}],
+    "special": {"frequency": 1, "quantity": 2}
+  },
+  "hotspots": [{
+    "rank": 1, "subcategory": "RES_SACHETS", "criteria": ["MOST_FREQUENT","HIGHEST_QUANTITY","AVOIDABLE"],
+    "frequency": 12, "quantity": 40, "score": 1.0,
+    "recommendations": [{
+      "interventionId": "…", "code": "RES_SACHETS_REFILL_STATION", "type": "REDUCE",
+      "title": "…", "description": "…", "howTo": ["…"], "costLevel": "SAVES_MONEY", "effort": "LOW",
+      "note": "You logged 12 sachets — mostly shampoo…", "continued": false, "adopted": true
+    }]
+  }],
+  "comparison": {
+    "previousWeekStart": "2026-09-20",
+    "total": {"previous": 130, "current": 118, "delta": -12, "deltaPct": -9.2, "trend": "DECREASED"},
+    "categories": [ … ], "subcategories": [ … ]
+  },
+  "impacts": [{
+    "interventionId": "…", "title": "…", "targetSubcategory": "RES_PLASTIC_BAGS",
+    "baselineWeekStart": "2026-09-20", "baselineQuantity": 15, "followupQuantity": 9, "result": "DECREASED"
+  }]
+}
+```
+
+## 4. Contract change process
+
+1. Open a PR in `menosan-api` that updates `docs/api-contract.md`, adds a line to `docs/CHANGELOG-contract.md`, and implements the change **backward-compatibly** (additive fields only after the Android beta is released on 9/26).
+2. Open a matching issue in `menosan-android` labeled `contract-change`.
+3. Breaking changes after 9/26 require human approval.
+
+## 5. Clarifications (BE-0, part of v1)
+
+These fill gaps in the plan and don't change anything above. They're also logged in `docs/DECISIONS.md`.
+
+### 5.1 HTTP status per error code
+Clients should switch on `error.code`, not only on the status.
+
+| Code | Status |
+|---|---|
+| `UNAUTHENTICATED` | 401 |
+| `ACCOUNT_NOT_FOUND` | 404 |
+| `VALIDATION_FAILED` | 400 (415 when the `Content-Type` isn't JSON) |
+| `INVALID_TIMESTAMP` | 422 |
+| `WEEK_CLOSED` | 409 |
+| `NOT_FOUND` | 404 (also for unknown paths) |
+| `CONFLICT` | 409 |
+| `ADOPTION_WINDOW_CLOSED` | 409 |
+| `ANALYSIS_FAILED` | 422 |
+| `NOT_WASTE` | 422 |
+| `IMAGE_TOO_LARGE` | 413 |
+| `RATE_LIMITED` | 429 |
+| `INTERNAL` | 500 (501 while an endpoint is still a stub during development) |
+
+- `details` is always a JSON object. It is `{}` unless noted. For example, `VALIDATION_FAILED` on `POST /v1/account` sends `{"field":"consent"}`.
+- Messages are short, user-safe English. They never echo request content.
+
+### 5.2 `GET /health`
+- `200 {"status":"ok","db":"ok"}` when the database answers.
+- `503 {"status":"degraded","db":"down"}` otherwise.
+
+### 5.3 `GET /v1/taxonomy`
+Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone": "Asia/Manila"`:
+`{version, timezone, categories:[{code,label,analyzed}], subcategories:[{code,category,label,examples,avoidable,sortOrder}]}`.
+
+### 5.4 `POST /v1/account`
+- `consent` must be `true`. A missing body, `false`, or a missing field returns `400 VALIDATION_FAILED` and creates nothing.
+- The response body for `200` and `201` has the same shape as `GET /v1/me`.
+- `email` and `displayName` come from the verified Firebase token, never from the request body.
+
+### 5.5 `GET /v1/me` and `GET /v1/weeks/current`
+- `createdAt` and `serverNow` are ISO-8601 UTC instants with at most millisecond precision.
+- `displayName` may be `null`.
+- Example: `{"weekStart":"2026-09-27","weekEnd":"2026-10-03","timezone":"Asia/Manila","serverNow":"2026-09-30T04:00:00Z"}`.
+
+### 5.6 Request IDs
+- Every response carries `X-Request-Id`.
+- Clients may send their own `X-Request-Id` (1–64 letters, digits, `-` or `_`), and the server echoes it back. Anything else is replaced with a server-generated UUID, and the request is never rejected because of it.
+- Include the ID in bug reports.
