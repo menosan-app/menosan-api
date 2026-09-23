@@ -45,6 +45,7 @@ curl -s https://<service>.onrender.com/health   # {"status":"ok","db":"ok"} once
 
 ## 9. Environment / setup notes
 - No new env vars. Render generates `JOB_KEY`. The four secrets per service are entered in the dashboard.
+- **Branches cleaned up:** every `feat/*` branch (local and on `origin`) was fully merged into `main` and has been deleted, along with the `menosan-api-be2`/`-be5` worktrees. Only `main` remains. Start new work from `main` (`git worktree add -b feat/<ws>-<short> ../menosan-api-<ws> main`).
 
 ## 10. Questions / blockers for humans
 - Render plan cost: 2 × Starter. Free is possible for staging, with caveats (ENVIRONMENTS §3 notes).
