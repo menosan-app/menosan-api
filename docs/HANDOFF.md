@@ -21,6 +21,23 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 - [x] Wiring: `AppDeps` gained `accountDeletion` and `exporter` (stub defaults), `main()` uses the real implementations, routes mounted in `Application.module`.
 - [x] Tests (embedded PG): `EntryValidationTest`, `EntryRoutesTest`, `EntrySyncTest`, `AccountDeletionTest`, `ExportRoutesTest`, `EntryLoggingPrivacyTest`. Shared helpers in `src/test/kotlin/app/menosan/DbTestSupport.kt` (`DbTestEnv` gives fresh uids/tokens per test, `RecordingReportService`, `FakeFirebaseUsers`, `seedReportGraph`). A quick mutation check (removing the delete week check) was caught by 2 tests.
 - [x] `docs/api-contract.md` §6 (additive BE-1 clarifications), `CHANGELOG-contract.md`, 8 `DECISIONS.md` lines. (`11ddcc9`)
+# Handoff — menosan-api — 2026-09-23 09:45 PHT
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-3 Analytics, reports, jobs (docs/DEVELOPMENT_PLAN.md §5, §9 BE-3)
+- **Branch:** `feat/be3-reports` (worktree `menosan-api-be3`, not pushed) · **Last code commit:** `27c74ec fix(reports): order impacts by target, then intervention id, like measureImpact()`
+- **Overall state:** 🟢 BE-3 code complete, 87/87 tests green (46 from BE-0 + 41 new), `buildFatJar` OK. Not yet merged to `main`.
+- Note: the session prompt said "branch feat/be1-entries", but that branch is checked out in the BE-1 worktree (`menosan-api-be1`) and belongs to BE-1. BE-3 work stayed on `feat/be3-reports` (plan §14 naming).
+
+## 2. Done this session
+- [x] Pure analytics `analytics/Analytics.kt`: `aggregate()`, `findHotspots()`, `compare()`, `measureImpact()`, `ALGORITHM_VERSION = 1`. Only stdlib + kotlinx.serialization (a test enforces this) so Android can copy the file. Integer rounding, half away from zero. (`92a33a4`)
+- [x] `docs/analytics-test-vectors.json`: 21 cases (ties, cap of 3, avoidable-by-score, only-special, empty, rounding, comparison with/without/only-special previous week, impact DECREASED/SAME/INCREASED/target-not-logged/missing follow-up/special-only follow-up, full week). `AnalyticsVectorsTest` runs all four functions against it. `AnalyticsTest` has 19 hand-computed cases. (`92a33a4`)
+- [x] `reports/`: `DefaultReportService` (ensureReport, catchUp, onLateEntry, generateMissing, listReports, getReport) and `ReportStore` (all SQL, user-scoped). Idempotent insert via `ON CONFLICT DO NOTHING`. Regeneration locks the report row (`FOR UPDATE`), keeps surviving hotspots' recommendations and all adoptions, bumps `revision`, and also regenerates W+1. The engine is called outside the transaction. (`032bdd6`)
+- [x] `GET /v1/reports`, `GET /v1/reports/{weekStart}` (§8.3 payload with `adopted` flags and `impacts`), `isLatest`. `parseWeekStart()` is reusable. (`032bdd6`)
+- [x] `jobs/WeeklyReportJob.kt`: `POST /internal/jobs/weekly-reports` (`X-Job-Key`, optional `{weekStart}`), `requireJobKey()` for BE-5, and the in-process scheduler (Sunday 00:05 PHT, polls the injected clock every minute). Started in `main()`. (`032bdd6`)
+- [x] `.github/workflows/weekly-reports.yml` (cron `5 16 * * 6`), disabled unless the repo variable `WEEKLY_REPORTS_ENABLED == 'true'`. (`811bdd7`)
+- [x] `api-contract.md` §5.7–§5.8 clarifications (no shape changes), CHANGELOG line, 10 `DECISIONS.md` lines. (`811bdd7`)
 
 ## 3. In progress (unfinished)
 | Item | Where | What's left |
@@ -28,6 +45,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 | — | — | Nothing half-done. |
 
 ## 4. Next steps (in order)
+<<<<<<< HEAD
 1. **Human:** review and merge `feat/be1-entries` into `main` (expect small conflicts in `Application.kt`/`AppDeps.kt` if BE-3/BE-4 merge first: keep both sides' params and routes).
 2. ~~**Human:** smoke-test against Neon `dev` with a real token~~: done 2026-09-23.
 3. **Human:** open the `contract-change` issue in `menosan-android` pointing to `api-contract.md` §6 (plan §8.4). Android DTOs should follow §6 (entry list wrapper, sync result shape).
@@ -72,6 +90,65 @@ curl -s localhost:8080/v1/entries -H "Authorization: Bearer $TOKEN"   # {weekSta
 ## 10. Questions / blockers for humans
 - Merge order for `feat/be1-entries`, `feat/be3-reports`, `feat/be4-interventions`.
 - Open BE-0 items still apply: real-token check, first CI run after pushing `main`, `.env` `CLOCK_OVERRIDE=true` fix, hosting decision (Thu 9/24 noon).
+=======
+1. **Human:** review and merge `feat/be3-reports` into `main`. Expect trivial conflicts in `Application.kt` (BE-1/BE-4 also add routes there) and `docs/DECISIONS.md` / `CHANGELOG-contract.md` (append-only tables: keep both sides).
+2. **BE-1 (when merging):** after a *create* into a closed week, call `deps.reports.onLateEntry(userId, weekStart)`. It now really regenerates, so call it after the entry's transaction commits. Export can read `weekly_reports.stats`/`comparison` via `ReportJson` + `WeeklyStats`/`Comparison` (`reports/ReportModels.kt`), or call `reports.getReport(userId, week)` for each week.
+3. **BE-4 (when merging):**
+   - In `main()`, replace `val interventions: InterventionEngine = StubInterventionEngine` with the real engine. It feeds both `AppDeps.interventions` and `DefaultReportService`.
+   - Adoption routes: use `parseWeekStart()`. The I7 window is `weekStart == WeekCalc.currentWeekStart(clock).minusDays(7)`. Return `reports.getReport(userId, weekStart)`.
+   - `baseline_quantity` = the target subcategory's quantity in that report's `stats.subcategories` (0 if absent).
+   - The payload's `adopted` flag is already computed from `adopted_interventions` (BE-3).
+   - Reports generated before BE-4 lands have no recommendations; they aren't regenerated on read, by design (§6.2).
+4. **BE-5:** `/internal/dev/*` can reuse `call.requireJobKey(config.jobKey)` and `reports.ensureReport` / `generateMissing`. Enable `weekly-reports.yml` once hosting is decided (set `WEEKLY_REPORTS_ENABLED`, `API_BASE_URL`, secret `JOB_KEY`).
+5. **Android (AN-3):** copy `src/main/kotlin/app/menosan/analytics/Analytics.kt` (change the package) and `docs/analytics-test-vectors.json` to `app/src/test/resources/`. The vectors' `about` field explains how to run each case.
+
+## 5. Verify the current state
+```bash
+# Windows without a JDK on PATH (bash): export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+./gradlew test           # 87 tests, 0 failures
+./gradlew test --tests '*Analytics*'        # pure analytics + shared vectors
+./gradlew test --tests '*Report*' --tests '*WeeklyReportJob*'   # DB-backed service, routes, job
+REGEN_ANALYTICS_VECTORS=true ./gradlew test --tests '*AnalyticsVectorsTest*'   # only after an intended rule change + ALGORITHM_VERSION bump; review the diff
+./gradlew buildFatJar
+```
+- New test classes: `AnalyticsTest`, `AnalyticsVectorsTest`, `ReportServiceTest`, `ReportRoutesTest`, `WeeklyReportJobTest`. Fixtures: `reports/ReportFixtures.kt` (+ `ReportApp` in `ReportRoutesTest.kt`).
+- DB tests share one embedded Postgres, so tests that call the job across all users use weeks no other test touches (2026-07-05, 2026-08-02).
+
+## 6. Known issues / failing tests
+- None failing.
+- **Smoke-tested on Neon `dev` (2026-09-23 10:45 PHT), then cleaned up.** Seeded one throwaway user and entries in weeks 2026-08-16 and 2026-08-23 by SQL (the entries API is still BE-1's stub). Ran `./gradlew run` and called `POST /internal/jobs/weekly-reports`:
+  - Error cases: missing or wrong key → 401, open week → 400, non-Sunday → 400.
+  - Generation: each week `created: 1`, then `created: 0` on a repeat (idempotent).
+  - The stored stats, hotspots, scores, and comparison matched a hand calculation of §5.
+  - Logs held only method, path, status, and request id.
+  - The scheduler logged its next run as `2026-09-26T16:05:00Z`.
+  - Afterwards the user was deleted; the cascade left 0 users, entries, and reports on `dev`.
+- Not yet checked on a live server: report reads (`GET /v1/reports*`, which need a real Firebase token) and recommendations (the stub engine returns none until BE-4).
+- Neon `dev` runs PostgreSQL **18.6**. Tests use embedded PG 17. No issue seen, but BE-0's "PG 17 matches Neon" note is out of date.
+- Stopping `./gradlew run` from a tool can leave the forked `ApplicationKt` JVM listening on 8080. Check the port and stop that process.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- Integer rounding (half away from zero) for share, deltaPct, and score.
+- Impact uses the adoption's stored `baseline_quantity`.
+- No follow-up entries → no impact rows; "Not measured" is client-side.
+- Regeneration drops hotspots that fell out of the top 3 (and their recommendations), never adoptions.
+- Reports read `waste_entries` directly (independent of BE-1's `EntryRepository`).
+- A bad `weekStart` returns 400. An open or empty week returns 404.
+- Job endpoint: 404 without `JOB_KEY`, 401 for a bad key.
+- The scheduler polls the clock every minute.
+
+## 8. API contract changes
+- `api-contract.md` §5.7 (reports) and §5.8 (job endpoint): clarifications only, and §3 is unchanged. CHANGELOG line added. No Android issue needed (non-breaking), but tell AN-3 about the comparison row shapes in §5.7.
+
+## 9. Environment / setup notes
+- No new env vars (uses the existing `JOB_KEY`), no migrations, no new dependencies.
+- The scheduler starts only in `main()`, not in `Application.module`, so tests never start it by accident.
+
+## 10. Questions / blockers for humans
+- Push `feat/be3-reports` and open a PR (CI hasn't run on it).
+- Hosting decision (still due Thu 9/24 noon) gates enabling `weekly-reports.yml`.
+- Carried over from BE-0: real-token check, `.env` `CLOCK_OVERRIDE=true` fix.
+>>>>>>> feat/be3-reports
 
 ---
 

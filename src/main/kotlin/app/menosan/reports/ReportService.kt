@@ -5,8 +5,8 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * Weekly report generation (plan §5.5–§5.6). **Owned by BE-3**, which replaces [StubReportService]
- * and adds the read methods needed by `GET /v1/reports`.
+ * Weekly report generation and reads (plan §5.5–§5.6). **Owned by BE-3**; the real implementation is
+ * [DefaultReportService].
  */
 interface ReportService {
     /**
@@ -23,9 +23,19 @@ interface ReportService {
 
     /** Weekly job: generate missing reports for [weekStart] (default: the week that just closed). Returns how many were created. */
     suspend fun generateMissing(weekStart: LocalDate?): Int
+
+    /** `GET /v1/reports`: runs [catchUp], then lists the user's reports, newest first. */
+    suspend fun listReports(userId: UUID): List<ReportSummary>
+
+    /**
+     * `GET /v1/reports/{weekStart}` payload (§8.3), generating the report first if it is missing.
+     * Null when the week is still open or the user logged nothing in it. Always scoped to [userId].
+     * BE-4 returns this after adoption changes.
+     */
+    suspend fun getReport(userId: UUID, weekStart: LocalDate): ReportResponse?
 }
 
-/** No-op stub so other workstreams can call it before BE-3 lands. */
+/** No-op stub, kept for tests that don't need reports. */
 object StubReportService : ReportService {
     private val log = LoggerFactory.getLogger(StubReportService::class.java)
 
@@ -35,4 +45,6 @@ object StubReportService : ReportService {
         log.info("onLateEntry ignored by stub (weekStart={})", weekStart)
     }
     override suspend fun generateMissing(weekStart: LocalDate?): Int = 0
+    override suspend fun listReports(userId: UUID): List<ReportSummary> = emptyList()
+    override suspend fun getReport(userId: UUID, weekStart: LocalDate): ReportResponse? = null
 }
