@@ -253,7 +253,7 @@ class ReportStore(private val db: Db) {
             .join(Interventions, JoinType.INNER, AdoptedInterventions.interventionId, Interventions.id)
             .selectAll()
             .where { InterventionImpacts.followupReportId eq reportId }
-            .orderBy(AdoptedInterventions.targetSubcategory to SortOrder.ASC, Interventions.code to SortOrder.ASC)
+            .orderBy(AdoptedInterventions.targetSubcategory to SortOrder.ASC, AdoptedInterventions.interventionId to SortOrder.ASC)
             .map {
                 ImpactResponse(
                     interventionId = it[AdoptedInterventions.interventionId].toString(),
