@@ -58,6 +58,9 @@ class AdoptionRoutesTest {
         ),
         users = ExposedUserRepository(db),
         adoptions = ExposedAdoptionService(db, clock),
+        // No report service here (reports are inserted as bare rows), so respond with the adoption state only.
+        // The full-report response is covered by AdoptionReportFlowTest.
+        reportResponder = AdoptionStateResponder(ExposedAdoptionService(db, clock)),
     )
 
     private fun test(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {

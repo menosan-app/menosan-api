@@ -3,6 +3,8 @@ package app.menosan.interventions
 import app.menosan.common.ApiException
 import app.menosan.common.ErrorCode
 import app.menosan.plugins.principal
+import app.menosan.reports.ReportService
+import app.menosan.reports.parseWeekStart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -12,25 +14,31 @@ import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.util.UUID
 
 @Serializable
 data class AdoptRequest(val interventionIds: List<String>? = null)
 
-/** Interim adoption response until BE-3's report payload is wired through [ReportResponder]. */
+/** Minimal adoption state, used by [AdoptionStateResponder] in tests that run without a report service. */
 @Serializable
 data class AdoptionsResponse(val weekStart: String, val adoptedInterventionIds: List<String>)
 
-/**
- * Writes the response after an adoption change. The contract says "→ the updated report" (§8.2), so BE-3
- * provides one that renders the full §8.3 payload. [AdoptionStateResponder] is the interim default.
- */
+/** Writes the response after an adoption change. The contract says "→ the updated report" (§8.2). */
 fun interface ReportResponder {
     suspend fun respond(call: ApplicationCall, userId: UUID, weekStart: LocalDate)
 }
 
+/** The production responder: the full §8.3 report from BE-3, with `adopted` flags reflecting the change. */
+class ReportServiceResponder(private val reports: ReportService) : ReportResponder {
+    override suspend fun respond(call: ApplicationCall, userId: UUID, weekStart: LocalDate) {
+        val report = reports.getReport(userId, weekStart)
+            ?: throw ApiException(ErrorCode.NOT_FOUND, "Report not found.")
+        call.respond(report)
+    }
+}
+
+/** Responds with only the adopted ids. For tests that don't wire a real [ReportService]. */
 class AdoptionStateResponder(private val adoptions: AdoptionService) : ReportResponder {
     override suspend fun respond(call: ApplicationCall, userId: UUID, weekStart: LocalDate) {
         val ids = adoptions.adoptedIds(userId, weekStart)
@@ -68,13 +76,7 @@ fun Route.adoptionRoutes(adoptions: AdoptionService, responder: ReportResponder)
     }
 }
 
-private fun ApplicationCall.weekStartParam(): LocalDate {
-    val date = runCatching { LocalDate.parse(parameters["weekStart"]) }.getOrNull()
-    if (date == null || date.dayOfWeek != DayOfWeek.SUNDAY) {
-        throw invalid("weekStart", "weekStart must be a Sunday date (YYYY-MM-DD).")
-    }
-    return date
-}
+private fun ApplicationCall.weekStartParam(): LocalDate = parseWeekStart(parameters["weekStart"])
 
 private fun parseUuid(value: String?): UUID? =
     value?.let { runCatching { UUID.fromString(it) }.getOrNull() }?.takeIf { it.toString().equals(value, ignoreCase = true) }

@@ -123,7 +123,36 @@ Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone"
 - Clients may send their own `X-Request-Id` (1–64 letters, digits, `-` or `_`), and the server echoes it back. Anything else is replaced with a server-generated UUID, and the request is never rejected because of it.
 - Include the ID in bug reports.
 
-### 5.7 Adoption (`POST /v1/reports/{weekStart}/adoptions`, `DELETE …/adoptions/{interventionId}`)
+### 5.7 Reports (BE-3)
+Added 2026-09-23 by BE-3. These fill gaps in §3 and don't change its shape.
+
+- `GET /v1/reports` returns a bare JSON array (newest first), exactly as in §2. It is `[]` when there are no reports.
+- `isLatest` is `true` only for the report whose `weekStart` is the current week's start minus 7 days. Only that report accepts adoptions (plan I7).
+- `GET /v1/reports/{weekStart}`:
+  - `weekStart` must be a Sunday in `YYYY-MM-DD` format. Otherwise the response is `400 VALIDATION_FAILED` with `details.field = "weekStart"`.
+  - `404 NOT_FOUND` when the week is still open, when the user logged nothing that week, or when the report would belong to someone else.
+  - A missing report for a closed week that has entries is generated before responding.
+- `stats` (plan §5.1):
+  - `categories` always lists the three analyzed categories in the order `BIODEGRADABLE`, `RECYCLABLE`, `RESIDUAL`, including those with zero entries. `sharePct` is `0.0` when nothing analyzed was logged.
+  - `subcategories` lists only analyzed subcategories with at least one entry, ordered by quantity (desc), then frequency (desc), then code.
+  - SPECIAL waste appears only in `special`.
+- `hotspots` (plan §5.2): at most 3, ordered by `rank`. `criteria` holds `MOST_FREQUENT`, `HIGHEST_QUANTITY`, and `AVOIDABLE`, in that order. `score` has at most 4 decimals. The list is empty for a week with only SPECIAL waste. `recommendations` (1–3, ordered by rank) may be empty if no curated item could be picked.
+- `comparison` (plan §5.3) is `null` when the previous week has no analyzed entries. Otherwise the rows are:
+  - `total: {previous, current, delta, deltaPct, trend}`
+  - `categories: [{category, previous, current, delta, deltaPct, trend}]`: all three analyzed categories, in the same order as `stats`.
+  - `subcategories: [{code, category, previous, current, delta, deltaPct, trend}]`: every analyzed subcategory present in either week, ordered by code.
+  - All values are quantities (pieces). `deltaPct` is rounded to 1 decimal (half away from zero) and is `null` when `previous` is 0. `trend` is `DECREASED`, `SAME`, or `INCREASED`.
+- `impacts` (plan §5.4) lists the interventions adopted on the previous week's report, measured in this week, ordered by `targetSubcategory`, then `interventionId` (same order as `measureImpact()`). `baselineQuantity` is the value stored at adoption time. `followupQuantity` is `0` when the target wasn't logged this week.
+  - If nothing at all was logged the following week, there is no following report and no impact rows exist. In that case the client shows "Not measured" on the adopted cards of the earlier report once that following week has closed.
+- `revision` starts at 1 and increases each time a late offline sync regenerates the report (plan §5.6). Regeneration keeps adoptions and the recommendations of hotspots that still exist. A hotspot that is no longer in the top 3 is removed along with its recommendations, but adoptions of its interventions are kept and still measured.
+- The same rules are implemented for offline reports on Android and are pinned by `docs/analytics-test-vectors.json`.
+
+### 5.8 `POST /internal/jobs/weekly-reports`
+- Header `X-Job-Key` must equal the server's `JOB_KEY`. If it is missing or wrong, the response is `401 UNAUTHENTICATED`. If the server has no `JOB_KEY` configured, the endpoint returns `404 NOT_FOUND`.
+- The body is optional: `{"weekStart":"YYYY-MM-DD"}`. An empty body means the week that just closed. A `weekStart` that isn't a Sunday, or whose week hasn't closed yet, returns `400 VALIDATION_FAILED`.
+- The response is `200 {"weekStart":"2026-09-27","created":12}`. The job is idempotent: it only creates reports that are missing.
+
+### 5.9 Adoption (`POST /v1/reports/{weekStart}/adoptions`, `DELETE …/adoptions/{interventionId}`)
 - `weekStart` must be a Sunday date (`YYYY-MM-DD`). Anything else returns `400 VALIDATION_FAILED` with `details.field = "weekStart"`.
 - POST body: `{"interventionIds": [uuid, …]}` with 1–9 ids. An empty or missing list, more than 9 ids, or an id that isn't a UUID returns `400 VALIDATION_FAILED` with `details.field = "interventionIds"`.
 - No report for that week (including another user's report) returns `404 NOT_FOUND`.
@@ -131,3 +160,71 @@ Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone"
 - Every id must be one of the report's recommendations. Otherwise the request returns `400 VALIDATION_FAILED` (`details.field = "interventionIds"`) and nothing is adopted (all-or-nothing).
 - Both are idempotent. Adopting again keeps the original adoption and baseline, and un-adopting something that isn't adopted still returns `200`.
 - Both return `200` with the updated full report (§3), where `hotspots[].recommendations[].adopted` reflects the change.
+
+## 6. Clarifications (BE-1, part of v1)
+
+Additive only: these define shapes and error cases the plan left open. They're also logged in `docs/DECISIONS.md`.
+
+### 6.1 Entry object
+Returned by `PUT /v1/entries/{id}`, `GET /v1/entries`, and `POST /v1/entries/sync`:
+
+```json
+{"id": "8b0c…", "name": "Coffee 3-in-1 sachet", "category": "RESIDUAL", "subcategory": "RES_SACHETS",
+ "quantity": 3, "source": "MANUAL", "createdAt": "2026-09-29T01:00:00Z", "weekStart": "2026-09-27",
+ "updatedAt": "2026-09-29T01:00:02Z", "editable": true}
+```
+
+- `category` and `weekStart` are derived by the server. `editable` is `true` only when `weekStart` is the server's current week.
+- `createdAt` is stored with millisecond precision. Any ISO-8601 instant with `Z` or an offset is accepted and returned in UTC.
+
+### 6.2 `GET /v1/entries?weekStart=`
+- Response: `{weekStart, weekEnd, editable, entries: [Entry]}`. Entries are newest first (`createdAt` desc).
+- `weekStart` defaults to the current week. Any past week is allowed. A value that isn't a Sunday `YYYY-MM-DD` returns `400 VALIDATION_FAILED` (`details.field = "weekStart"`).
+
+### 6.3 `PUT /v1/entries/{id}`
+- `{id}` must be a canonical UUID (client-generated). Otherwise `400 VALIDATION_FAILED` (`details.field = "id"`).
+- Field rules → `400 VALIDATION_FAILED` with `details.field`: `name` (trimmed, 1–60 characters), `subcategory` (a taxonomy code), `quantity` (1–999), `source` (`MANUAL` | `PHOTO`), `createdAt` (ISO-8601 instant). A wrong JSON type also returns `400`, without `details.field`.
+- **Create** (id not seen before): `createdAt` more than 5 minutes ahead of the server → `422 INVALID_TIMESTAMP` (`details.reason = "FUTURE"`). More than 14 days old → `422 INVALID_TIMESTAMP` (`details.reason = "TOO_OLD"`). A create into a closed week within 14 days is accepted (`201`) and refreshes that week's report (plan §5.6).
+- **Update** (id exists for this user): `createdAt` must equal the stored value, else `400 VALIDATION_FAILED` (`details.field = "createdAt"`). If the entry's week is not the current week → `409 WEEK_CLOSED` (`details.weekStart`).
+- **Unchanged replay:** a PUT whose fields all equal the stored entry returns `200` with the entry in any week, even a closed one, so retrying a create that already succeeded is never an error.
+- An id that belongs to another user → `409 CONFLICT` (`details.field = "id"`). The other user's entry is untouched.
+
+### 6.4 `DELETE /v1/entries/{id}`
+- `204` when deleted, when the id doesn't exist, and when it belongs to another user (nothing is deleted then).
+- `409 WEEK_CLOSED` (`details.weekStart`) when the entry is in a past week.
+
+### 6.5 `POST /v1/entries/sync`
+- Request: `{"upserts": [{id, name, subcategory, quantity, source, createdAt}], "deletes": ["<id>"]}`. Both lists are optional. At most 500 items in total, otherwise the whole request gets `400 VALIDATION_FAILED`.
+- Upserts run first, then deletes, each in request order and each on its own (same rules as `PUT` and `DELETE`).
+- Response: `{"results": [{id, op, status, entry, message}]}` with one result per item, in the same order (upserts, then deletes).
+  - `op`: `UPSERT` | `DELETE`. `id`: the item's id, or `null` if the item had no string id.
+  - `status`: `OK` | `WEEK_CLOSED` | `INVALID` (any `VALIDATION_FAILED` rule, a malformed item, or a bad id) | `INVALID_TIMESTAMP` | `CONFLICT` | `ERROR` (server-side problem: keep the item and retry later).
+  - `entry`: the saved entry for an `OK` upsert. For `WEEK_CLOSED`, the **unchanged server copy**, so the app can revert its local change. Otherwise `null`.
+  - `message`: a short, user-safe reason when `status` isn't `OK`, else `null`.
+- Deleting a missing id is `OK`. Retrying a whole batch is safe: nothing is duplicated.
+
+### 6.6 `GET /v1/export`
+- `200` with `Content-Disposition: attachment; filename=menosan-export-YYYY-MM-DD.json` (Manila date) and `Cache-Control: no-store`.
+- Body:
+
+```json
+{
+  "format": "menosan-export", "exportVersion": 1, "exportedAt": "…", "timezone": "Asia/Manila",
+  "profile": {"id", "email", "displayName", "createdAt", "consentedAt"},
+  "entries": [{"id", "name", "category", "subcategory", "quantity", "source", "createdAt", "weekStart", "updatedAt", "receivedAt"}],
+  "reports": [{
+    "weekStart", "weekEnd", "revision", "algorithmVersion", "generatedAt", "regeneratedAt",
+    "stats": {…}, "comparison": {…} | null,
+    "hotspots": [{"rank", "subcategory", "criteria", "frequency", "quantity", "score",
+                  "recommendations": [{"interventionId", "code", "title", "rank", "note", "continued", "source"}]}],
+    "adoptions": [{"interventionId", "code", "title", "targetSubcategory", "baselineWeekStart", "baselineQuantity", "adoptedAt",
+                   "impact": {"followupWeekStart", "baselineQuantity", "followupQuantity", "result"} | null}]
+  }]
+}
+```
+
+- Entries are oldest first, reports by `weekStart` ascending. `stats` and `comparison` are the stored report JSON (plan §5.1, §5.3). Adoptions are listed under the report they were made on (the baseline week).
+
+### 6.7 `DELETE /v1/account`
+- Needs a valid token but **not** an account, so it's safe to retry: `204` also when the Menosan account is already gone.
+- Deletes every database row of the account first, then the Firebase user. If the Firebase call fails, the response is `500 INTERNAL` (the data is already gone) and the app should retry. After `204`, the app signs out and clears local data.
