@@ -53,7 +53,16 @@ REGEN_ANALYTICS_VECTORS=true ./gradlew test --tests '*AnalyticsVectorsTest*'   #
 
 ## 6. Known issues / failing tests
 - None failing.
-- Not verified against Neon `dev` or with a real token. There are no migrations in BE-3, so no schema risk.
+- **Smoke-tested on Neon `dev` (2026-09-23 10:45 PHT), then cleaned up.** Seeded one throwaway user and entries in weeks 2026-08-16 and 2026-08-23 by SQL (the entries API is still BE-1's stub). Ran `./gradlew run` and called `POST /internal/jobs/weekly-reports`:
+  - Error cases: missing or wrong key → 401, open week → 400, non-Sunday → 400.
+  - Generation: each week `created: 1`, then `created: 0` on a repeat (idempotent).
+  - The stored stats, hotspots, scores, and comparison matched a hand calculation of §5.
+  - Logs held only method, path, status, and request id.
+  - The scheduler logged its next run as `2026-09-26T16:05:00Z`.
+  - Afterwards the user was deleted; the cascade left 0 users, entries, and reports on `dev`.
+- Not yet checked on a live server: report reads (`GET /v1/reports*`, which need a real Firebase token) and recommendations (the stub engine returns none until BE-4).
+- Neon `dev` runs PostgreSQL **18.6**. Tests use embedded PG 17. No issue seen, but BE-0's "PG 17 matches Neon" note is out of date.
+- Stopping `./gradlew run` from a tool can leave the forked `ApplicationKt` JVM listening on 8080. Check the port and stop that process.
 
 ## 7. Decisions made (also logged in docs/DECISIONS.md)
 - Integer rounding (half away from zero) for share, deltaPct, and score.
