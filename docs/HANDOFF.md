@@ -4,6 +4,63 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-24 02:10 PHT (staging deployed)
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-5 deployment: staging on Render, set up by hand
+- **Branch:** `main` (committed, **not pushed**)
+- **Overall state:** 🟢 **Staging is live** at `https://menosan-api-staging.onrender.com` (Neon `dev`, Free plan) and passed a smoke test. **Prod doesn't exist yet.**
+
+## 2. Done this session
+- [x] The human first created one service by hand (`menosan-api`, Neon `dev`) with *Add from .env*. Probing showed `JOB_KEY` unset (job endpoint 404) and dev tools off, most likely because the inline `# comments` in `.env` became part of the values. That service was **deleted**.
+- [x] Recreated as `menosan-api-staging`, by hand: Docker, Singapore, **Free**, health check `/health`, auto-deploy after CI checks pass, env vars typed with no comments (`APP_ENV=staging`, `DEV_TOOLS_ENABLED=true`, `JAVA_TOOL_OPTIONS=-XX:TieredStopAtLevel=1`, a new `JOB_KEY`, the Neon `dev` URLs, Firebase, Gemini).
+- [x] Smoke test on staging with a throwaway account (created and then deleted):
+  - `/health` ok. Without credentials, `/v1/*` → 401, and dev tools and the job endpoint → 401.
+  - `POST /v1/account` → 201, then `DELETE /v1/account` → 204, then `/v1/me` → 404.
+  - Photo analysis on a PET bottle photo → 200 "Water PET bottle / REC_PET_BOTTLES / 1 / 0.9" (4.9 s). The first try was a `422 ANALYSIS_FAILED` after 8.9 s (see §6).
+  - `seed-history` (3 weeks) → 3 reports with adoptions, impacts, and a `continued` pin. Dev clock not overridden.
+- [x] Repo: **`render.yaml` removed** (it was never applied, and its uncommitted Free-plan edits were discarded). The uncommitted `.github/workflows/keep-warm.yml` was dropped (staging on Free doesn't need it, and prod will be Starter). `docs/ENVIRONMENTS.md` §1–§3 and §8 rewritten for the manual setup. DECISIONS line added.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Gemini fallbacks | Render logs of `menosan-api-staging` | Only 2 of 7 hotspots got Gemini picks during the seed; 5 used rules (no `note`). The cause is still unknown. |
+
+## 4. Next steps (in order)
+1. **Human:** search the staging logs for `Gemini` (`… timed out after 8s`, `… failed (GeminiException)`, `… rejected (<reason>)`, `Photo analysis: …`). A timeout means raising the 8 s intervention limit (`LibraryInterventionEngine`) or using a faster model. A `429` means free-tier quota, so use a billing-enabled key (plan §13).
+2. **Human:** rotate the Firebase Admin service-account key (see §6), then update `.env` and staging's `FIREBASE_SERVICE_ACCOUNT_JSON_B64`.
+3. Push `main`. Send the staging URL to Android.
+4. Run `scripts/e2e-staging.sh` (staging `JOB_KEY` plus a throwaway token from `../token-helper/index.html`, served on `http://localhost:…`, e.g. with the JBR's `jwebserver`).
+5. Create prod by hand per `docs/ENVIRONMENTS.md` §3 (**Starter**, Neon `main`, `APP_ENV=prod`, its own `JOB_KEY`, auto-deploy off) **before testers log real weeks on Sun 9/27**. Then Neon prod retention ≤ 7 days, `weekly-reports.yml` variables and secret, and send the prod URL to Android.
+
+## 5. Verify the current state
+```bash
+curl -s https://menosan-api-staging.onrender.com/health          # {"status":"ok","db":"ok"} (up to ~1 min if asleep)
+curl -s -o /dev/null -w "%{http_code}\n" https://menosan-api-staging.onrender.com/internal/dev/clock   # 401
+```
+
+## 6. Known issues / failing tests
+- No code changes; tests not re-run.
+- Gemini fallback rate on staging (§3). The first photo analysis failed and the retry worked; the reason is only in the Render logs.
+- **Secret exposure:** while inspecting `.env`, the full `FIREBASE_SERVICE_ACCOUNT_JSON_B64` was printed into the agent session transcript (not sent anywhere else). Rotation is recommended (§4 step 2).
+- A leftover directory `D:/CCS6/Menosan/menosan-api-be5` still exists but is no longer a git worktree. It can be deleted.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- Render services are created by hand; `render.yaml` is removed. Staging = Free, prod = Starter (not created yet).
+
+## 8. API contract changes
+- None.
+
+## 9. Environment / setup notes
+- Staging env as in `docs/ENVIRONMENTS.md` §2. Staging's `JOB_KEY` is new and different from `.env`'s.
+- Free plan: staging sleeps after 15 idle minutes, and a wake-up clears the dev clock and the photo rate limits.
+
+## 10. Questions / blockers for humans
+- Gemini log lines (§4 step 1), Firebase key rotation, and creating prod before Sun 9/27.
+
+---
+
 # Handoff — menosan-api — 2026-09-23 (hosting: Render) PHT
 
 ## 1. Session
