@@ -161,6 +161,21 @@ Added 2026-09-23 by BE-3. These fill gaps in §3 and don't change its shape.
 - Both are idempotent. Adopting again keeps the original adoption and baseline, and un-adopting something that isn't adopted still returns `200`.
 - Both return `200` with the updated full report (§3), where `hotspots[].recommendations[].adopted` reflects the change.
 
+### 5.10 Staging dev tools (`/internal/dev/...`, BE-5)
+Not for the Android app. They exist only when `DEV_TOOLS_ENABLED=true` and `APP_ENV` isn't `prod`. Otherwise every path returns `404 NOT_FOUND`. Every call needs `X-Job-Key`, with the same rules as §5.8 (`404` without a configured `JOB_KEY`, `401 UNAUTHENTICATED` for a missing or wrong key). Accounts are found by email, case-insensitively: an unknown email returns `404 NOT_FOUND`, and several accounts with the same email return `409 CONFLICT`. Bad input returns `400 VALIDATION_FAILED` with `details.field` when one field is at fault. Usage: `docs/ENVIRONMENTS.md` §6.
+
+| Call | Body | Response `200` |
+|---|---|---|
+| `GET /internal/dev/clock` | — | `{serverNow, overridden, currentWeekStart}` |
+| `POST /internal/dev/clock` | `{"now":"<ISO instant>"}` sets the server-wide time, which keeps ticking from there. `{}`, `{"now":null}`, or no body restores real time. | same as GET |
+| `POST /internal/dev/seed-history` | `{email, weeks = 3 (1–8), adopt = true, seed = 1}` | `{userId, weeks:[{weekStart, entries, analyzedQuantity, hotspots:[code], adopted:[interventionCode], impacts}]}`, oldest first |
+| `POST /internal/dev/reset` | `{email}` | `{userId, reportsDeleted, entriesDeleted}` |
+| `POST /internal/dev/reports/generate` | `{email, weekStart, regenerate = false}` | the full report (§3) |
+
+- `seed-history` logs synthetic household entries (same `seed` → same entries) in the last `weeks` closed weeks, then generates their reports oldest first. With `adopt`, every report except the latest gets its top recommendation adopted (baseline = that hotspot's quantity), and the next week logs less of that subcategory, so the next report shows a `DECREASED` impact. `409 CONFLICT` (`details.weekStart`) if the account already has entries in one of those weeks. Reset it first.
+- `reset` deletes the account's entries and reports, including hotspots, recommendations, adoptions, and impacts. The account itself stays.
+- `reports/generate`: a week that hasn't closed returns `400`. `regenerate: true` rebuilds an existing report as after a late sync (plan §5.6, which also refreshes the next week's report and bumps `revision`). `404` if nothing was logged that week.
+
 ## 6. Clarifications (BE-1, part of v1)
 
 Additive only: these define shapes and error cases the plan left open. They're also logged in `docs/DECISIONS.md`.

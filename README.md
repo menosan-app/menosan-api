@@ -6,6 +6,7 @@ Kotlin + Ktor backend for **Menosan**, a household waste-prevention app for Duma
 - Agent rules: [`AGENTS.md`](AGENTS.md) · Handoff log: [`docs/HANDOFF.md`](docs/HANDOFF.md)
 - API contract: [`docs/api-contract.md`](docs/api-contract.md) · [`docs/CHANGELOG-contract.md`](docs/CHANGELOG-contract.md)
 - Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md)
+- Environments, deployment, staging dev tools, e2e: [`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md)
 - Taxonomy (source of truth): `src/main/resources/taxonomy.json`
 
 ## Local setup
