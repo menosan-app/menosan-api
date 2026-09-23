@@ -10,7 +10,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** BE-1 Accounts, entries, sync, export (docs/DEVELOPMENT_PLAN.md §9)
 - **Branch:** `feat/be1-entries` (worktree `D:/CCS6/Menosan/menosan-api-be1`, not pushed, not merged) · **Last code commit:** `11ddcc9 docs: BE-1 contract clarifications and decisions`
-- **Overall state:** 🟢 BE-1 code complete, 85/85 tests green (46 BE-0 + 39 new). Not yet run against Neon `dev` or with a real Firebase token.
+- **Overall state:** 🟢 BE-1 code complete, 85/85 tests green (46 BE-0 + 39 new). **Human-verified 2026-09-23:** reported all tests passing, including the manual walkthrough against Neon `dev` with a real Firebase token (entries, sync, export, account deletion).
 
 ## 2. Done this session
 - [x] Entry rules in `entries/EntryValidation.kt` (field validation, 5 min / 14 day create bounds, strict UUID parse) and `entries/EntryService.kt` (create/update/replay/week-closed/ownership, sync, late-entry trigger). (`82d79ef`)
@@ -29,7 +29,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ## 4. Next steps (in order)
 1. **Human:** review and merge `feat/be1-entries` into `main` (expect small conflicts in `Application.kt`/`AppDeps.kt` if BE-3/BE-4 merge first: keep both sides' params and routes).
-2. **Human:** smoke-test against Neon `dev` with a real token: `PUT /v1/entries/{uuid}` → `GET /v1/entries` → `GET /v1/export` → `DELETE /v1/account` (deletes the Firebase user too, so use a test Google account).
+2. ~~**Human:** smoke-test against Neon `dev` with a real token~~: done 2026-09-23.
 3. **Human:** open the `contract-change` issue in `menosan-android` pointing to `api-contract.md` §6 (plan §8.4). Android DTOs should follow §6 (entry list wrapper, sync result shape).
 4. **BE-3:** `ReportService.onLateEntry(userId, weekStart)` is now called for every late create (once per week per request, after commit; failures are only logged). Consider a staleness safety net in `ensureReport`/catch-up (e.g. `max(waste_entries.received_at) > coalesce(regenerated_at, generated_at)` → regenerate). `EntryRepository.listForWeek` and `userIdsWithEntries` are implemented and ready.
 5. **BE-5:** `seed-history` can insert entries via `EntryRepository.upsert` (bypasses the 14-day rule on purpose) or through `EntryService`.
