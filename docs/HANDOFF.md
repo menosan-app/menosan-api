@@ -25,10 +25,10 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 ## 3. In progress (unfinished)
 | Item | Where | What's left |
 |---|---|---|
-| Gemini fallbacks | Render logs of `menosan-api-staging` | Only 2 of 7 hotspots got Gemini picks during the seed; 5 used rules (no `note`). The cause is still unknown. |
+| Gemini fallbacks | Render logs of `menosan-api-staging` | Only 2 of 7 hotspots got Gemini picks during the seed; 5 used rules (no `note`). The logs showed `failed (GeminiException)` for all 5 and for the first photo try, with no status. **Fixed the logging** (`geminiErrorSummary`): after this deploys, the lines include the HTTP code and status (e.g. `ApiException 429 RESOURCE_EXHAUSTED`). Re-run a seed or photo analysis on staging, then read the status. |
 
 ## 4. Next steps (in order)
-1. **Human:** search the staging logs for `Gemini` (`… timed out after 8s`, `… failed (GeminiException)`, `… rejected (<reason>)`, `Photo analysis: …`). A timeout means raising the 8 s intervention limit (`LibraryInterventionEngine`) or using a faster model. A `429` means free-tier quota, so use a billing-enabled key (plan §13).
+1. **Human:** after the logging fix deploys, trigger a few Gemini calls on staging and search the logs for `Gemini` (`… timed out after 8s`, `… failed (GeminiException)`, `… rejected (<reason>)`, `Photo analysis: …`). A timeout means raising the 8 s intervention limit (`LibraryInterventionEngine`) or using a faster model. A `429` means free-tier quota, so use a billing-enabled key (plan §13).
 2. **Human:** rotate the Firebase Admin service-account key (see §6), then update `.env` and staging's `FIREBASE_SERVICE_ACCOUNT_JSON_B64`.
 3. Push `main`. Send the staging URL to Android.
 4. Run `scripts/e2e-staging.sh` (staging `JOB_KEY` plus a throwaway token from `../token-helper/index.html`, served on `http://localhost:…`, e.g. with the JBR's `jwebserver`).

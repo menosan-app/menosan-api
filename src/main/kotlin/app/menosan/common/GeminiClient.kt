@@ -19,6 +19,14 @@ data class GeminiRequest(
 class GeminiException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /**
+ * A log-safe summary of a failed Gemini call. [GeminiException] messages carry only the error type, HTTP code,
+ * status, and finish reason (e.g. "Gemini call failed: ApiException 429 RESOURCE_EXHAUSTED"), never content.
+ * Any other exception is logged by class name only.
+ */
+fun geminiErrorSummary(e: Throwable): String =
+    if (e is GeminiException) e.message ?: e.javaClass.simpleName else e.javaClass.simpleName
+
+/**
  * Thin, fakeable wrapper around the Google Gen AI SDK (`com.google.genai:google-genai`), called only from
  * the backend. BE-2 (photo) implements the real client; BE-4 (interventions) reuses it.
  */

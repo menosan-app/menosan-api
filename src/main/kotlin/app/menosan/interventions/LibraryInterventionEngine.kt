@@ -1,6 +1,7 @@
 package app.menosan.interventions
 
 import app.menosan.common.GeminiClient
+import app.menosan.common.geminiErrorSummary
 import app.menosan.taxonomy.Taxonomy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
@@ -46,7 +47,7 @@ class LibraryInterventionEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Gemini intervention selection failed ({}), using rules", e.javaClass.simpleName)
+            log.warn("Gemini intervention selection failed ({}), using rules", geminiErrorSummary(e))
             return null
         }
         if (raw == null) {

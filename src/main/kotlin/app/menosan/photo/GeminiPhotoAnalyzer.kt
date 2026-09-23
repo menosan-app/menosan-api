@@ -5,6 +5,7 @@ import app.menosan.common.ErrorCode
 import app.menosan.common.GeminiClient
 import app.menosan.common.GeminiImage
 import app.menosan.common.GeminiRequest
+import app.menosan.common.geminiErrorSummary
 import app.menosan.entries.NAME_MAX_LENGTH
 import app.menosan.entries.QUANTITY_MAX
 import app.menosan.entries.QUANTITY_MIN
@@ -68,7 +69,7 @@ class GeminiPhotoAnalyzer(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Photo analysis: Gemini call failed ({})", e.javaClass.simpleName)
+            log.warn("Photo analysis: Gemini call failed ({})", geminiErrorSummary(e))
             throw analysisFailed()
         } ?: run {
             log.warn("Photo analysis: Gemini timed out after {}", timeout)
