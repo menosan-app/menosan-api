@@ -1,12 +1,13 @@
 .gradle/
+.kotlin/
 build/
 out/
 .idea/
 *.iml
+*.hprof
 .env
+.env.*
+!.env.example
 *.jks
 *service-account*.json
 .DS_Store
-AGENTS.md
-CLAUDE.md
-docs/
