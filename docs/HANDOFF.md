@@ -10,7 +10,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** BE-0 Foundation (docs/DEVELOPMENT_PLAN.md §9)
 - **Branch:** `main` (not pushed) · **Last code commit:** `8d60b9c docs: api contract v1, contract changelog, decisions, env example, README`
-- **Overall state:** 🟢 BE-0 code complete, 46/46 tests green. Two DoD items need a human (see §10): boot against Neon `dev` and a real Firebase token check.
+- **Overall state:** 🟢 BE-0 code complete, 46/46 tests green. **Human-verified 2026-09-23:** `./gradlew run` boots against Neon `dev`, V1+V2 applied, `/health` and `/v1/taxonomy` OK. Still open: a real Firebase token check and the first CI run (see §10).
 
 ## 2. Done this session
 - [x] Stopped ignoring `AGENTS.md`, `CLAUDE.md`, and `docs/` (human decision). Added `.gitattributes` (LF for `gradlew`). (`04f4b1d`)
@@ -74,7 +74,9 @@ curl -si localhost:8080/v1/me                 # 401 UNAUTHENTICATED
 - Logback keeps the `Exposed` logger at WARN (DEBUG would log SQL with bound values, e.g. emails).
 
 ## 10. Questions / blockers for humans
-- **Verify BE-0 DoD on real infra:** run `./gradlew run` with your `.env` (applies V1+V2 to Neon `dev`), then `/health` + `/v1/taxonomy`, and do the real-token check (commands are in the session summary). Then push `main` so CI runs.
+- ~~Boot against Neon `dev`~~: done 2026-09-23 (V1+V2 are now applied on `dev`, so never edit them).
+- **Real-token check:** call `/v1/me` → `POST /v1/account` → `/v1/me` with a real Firebase ID token.
+- **Push `main`** so CI runs for the first time.
 - **Fix `.env`:** `CLOCK_OVERRIDE=true` isn't an ISO instant (it's ignored with a warning). Leave it empty, or set e.g. `2026-10-04T00:05:00Z`.
 - Hosting decision is still due Thu 9/24 noon (plan §11).
 
