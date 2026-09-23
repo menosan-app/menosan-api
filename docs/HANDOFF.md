@@ -9,8 +9,8 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 ## 1. Session
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** Integration: local `main` (BE-0 + BE-1 + BE-3) merged into `feat/be4-interventions`
-- **Branch:** `feat/be4-interventions` (worktree `menosan-api-be4`, not pushed) · **Merge commit:** see `git log -1` (parents `e3e686b` BE-4 + `9ec0097` main)
-- **Overall state:** 🟢 BE-0/1/3/4 integrated, **167/167 tests green**, `buildFatJar` OK. This branch is the first commit where all four workstreams compile together.
+- **Branch:** `main` (pushed; `origin/main` = merge commit `97de72a`, parents `e3e686b` BE-4 + `9ec0097` main)
+- **Overall state:** 🟢 BE-0/1/3/4 integrated on `main`, **167/167 tests green**, `buildFatJar` OK. **V3 applied to Neon `dev`.** The worktrees `menosan-api-be1`, `-be3`, and `-be4` were removed. Work from `D:/CCS6/Menosan/menosan-api`. The branches `feat/be1-entries`, `feat/be3-reports`, and `feat/be4-interventions` are kept and fully merged.
 
 ## 2. Done this session
 - [x] Aborted a half-finished merge of `origin/main` (`b6348ec`, BE-1 only, nothing resolved yet) and merged **local `main` (`9ec0097`)** instead. It contains `origin/main` plus BE-3, and `origin` had nothing newer.
@@ -19,6 +19,9 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 - [x] Adoption endpoints now return the **full report** (`ReportServiceResponder` → `ReportService.getReport`). The interim body is only used in tests (`AdoptionStateResponder`). Week parsing reuses BE-3's `parseWeekStart()`.
 - [x] New `AdoptionReportFlowTest`: log W2 → report with real library recommendations → adopt over HTTP (full report, `adopted` true, `adoptedCount` 1) → roll the clock → W3 impact `DECREASED` (10 → 4) and the adopted item pinned as `continued` → W2 adoption now 409.
 - [x] Docs: BE-4's adoption clarifications renumbered **§5.9** in `api-contract.md` (BE-3 owns §5.7–§5.8). CHANGELOG and DECISIONS kept both sides. The BE-4 interim-response decision was rewritten.
+- [x] `main` fast-forwarded to `97de72a` and pushed (done by a human).
+- [x] **V3 applied to Neon `dev` (2026-09-23 11:23 PHT)** using the app's own `migrate()`. First, a dry run of V3's SQL on `dev` inside a rolled-back transaction passed on PostgreSQL 18.6. After the real apply, Flyway history showed V1, V2, and V3 (checksum `-1928781153`, success), with 59 interventions covering 19 subcategories, at least 3 each. **V3 is now frozen:** library text changes need a new migration (`V4__…`, `UPDATE interventions … WHERE code = …`).
+- [x] Removed the finished worktrees `menosan-api-be1`, `menosan-api-be3`, and `menosan-api-be4`. They were clean, their HEADs are in `main`, and their only ignored files were `.env` copies identical to `main`'s.
 
 ## 3. In progress (unfinished)
 | Item | Where | What's left |
@@ -26,7 +29,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 | — | — | Nothing half-done. |
 
 ## 4. Next steps (in order)
-1. **Human:** fast-forward `main` to this merge (`git -C D:/CCS6/Menosan/menosan-api merge --ff-only feat/be4-interventions`), then push `main` so CI runs. Until then, local `main` doesn't compile.
+1. **Human:** check the first CI run on `main` (GitHub Actions).
 2. **BE-2:** merge `feat/be2-photo` when ready, and replace `StubGeminiClient` in `main()`. The same client feeds the intervention engine.
 3. **Cleanup (small):** `interventions/InterventionQueries.kt` `recommendationViews`/`RecommendationView`/`adoptionsForReport`/`AdoptionRecord` duplicate BE-3's `ReportStore` and are now used only by `InterventionQueriesTest`. They can be deleted.
 4. BE-5: dev tools, e2e on staging, deploy. Human tone review of the library (Fri 9/25). Android `contract-change` issues for §5.7–§5.9 and §6.
@@ -49,10 +52,11 @@ export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # Git Bash
 - None new. Only renumbering: BE-4 adoption clarifications §5.7 → §5.9.
 
 ## 9. Environment / setup notes
-- Migrations on this branch: V1, V2, V3 (`V3__seed_interventions.sql`, BE-4). V3 is **not yet applied** to Neon `dev`, so it will apply on the next `./gradlew run` against `dev`.
+- Migrations: V1, V2, V3, **all applied on Neon `dev`**. None is applied on `main` (prod) yet. Never edit V1–V3.
+- Only `D:/CCS6/Menosan/menosan-api` (branch `main`) remains as a worktree. For new parallel work, create a fresh worktree per branch (e.g. `git worktree add ../menosan-api-be2 feat/be2-photo`).
 
 ## 10. Questions / blockers for humans
-- Fast-forward and push `main` (step 1).
+- Check that CI on `main` is green (first run).
 - Carried over: real-token check for reports and adoption, hosting decision, library tone review.
 
 ---
