@@ -4,7 +4,7 @@ name: Weekly reports
 # The API also runs the job in-process and generates reports lazily on read; this cron covers hosts that
 # scale to zero. It is idempotent, so running it alongside the in-process job is safe.
 #
-# DISABLED until hosting is decided: it only runs when the repository variable WEEKLY_REPORTS_ENABLED is 'true'.
+# Hosting is Render (docs/ENVIRONMENTS.md). The job only runs when the repository variable WEEKLY_REPORTS_ENABLED is 'true'.
 # To enable it, set these in Settings → Secrets and variables → Actions:
 #   variables: WEEKLY_REPORTS_ENABLED=true, API_BASE_URL=https://<prod host>   (no trailing slash)
 #   secrets:   JOB_KEY (same value as the API's JOB_KEY env var)
