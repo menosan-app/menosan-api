@@ -24,6 +24,7 @@ object DotEnv {
     }
 
     private fun parseValue(raw: String): String {
+        if (raw.startsWith("#")) return "" // `KEY=   # comment`
         if (raw.length >= 2 && (raw[0] == '"' || raw[0] == '\'')) {
             val end = raw.indexOf(raw[0], startIndex = 1)
             if (end > 0) return raw.substring(1, end)

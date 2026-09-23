@@ -29,8 +29,10 @@ class AppConfigTest {
             SINGLE='x=y'
             URL=jdbc:postgresql://h/db?sslmode=require&user=u
             EMPTY=
+            EMPTY_WITH_COMMENT=             # ISO-8601 instant
             """.trimIndent(),
         )
+        assertEquals("", parsed["EMPTY_WITH_COMMENT"])
         assertEquals("dev", parsed["APP_ENV"])
         assertEquals("9090", parsed["PORT"])
         assertEquals("a # not a comment", parsed["QUOTED"])
@@ -98,6 +100,14 @@ class AppConfigTest {
             deleteOnExit()
         }
         assertFailsWith<ConfigException> { AppConfig.load(env = mapOf("APP_ENV" to "prod"), dotEnvFile = file) }
+    }
+
+    @Test
+    fun `env example parses without warnings`() {
+        val example = DotEnv.read(File(".env.example"))
+        assertEquals("", example["CLOCK_OVERRIDE"])
+        assertEquals("dev", example["APP_ENV"])
+        assertTrue(AppConfig.from(example).warnings.isEmpty())
     }
 
     @Test
