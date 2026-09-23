@@ -41,9 +41,17 @@ import kotlin.time.Duration.Companion.seconds
 @EnabledIfEnvironmentVariable(named = "GEMINI_LIVE_TEST", matches = "true")
 class GeminiLiveSmokeTest {
     private val env = DotEnv.read(File(".env")) + System.getenv()
-    private val model = env["GEMINI_MODEL"]?.takeIf { it.isNotBlank() } ?: AppConfig.DEFAULT_GEMINI_MODEL
-    private val client = GenAiGeminiClient(
-        requireNotNull(env["GEMINI_API_KEY"]?.takeIf { it.isNotBlank() }) { "GEMINI_API_KEY is not set" },
+    private val config = AppConfig.from(
+        mapOf("DATABASE_URL" to "-", "DATABASE_URL_DIRECT" to "-", "FIREBASE_PROJECT_ID" to "-", "FIREBASE_SERVICE_ACCOUNT_JSON_B64" to "-") + env,
+    )
+    private val apiKey = requireNotNull(config.geminiApiKey) { "GEMINI_API_KEY is not set" }
+
+    // The same models as the app: GEMINI_PHOTO_MODEL and GEMINI_INTERVENTION_MODEL, or their defaults.
+    private val client = client(config.geminiPhotoModel)
+    private val interventionClient = client(config.geminiInterventionModel)
+
+    private fun client(model: String) = GenAiGeminiClient(
+        apiKey,
         model,
         // For latency experiments: SMOKE_THINKING_LEVEL=minimal|low|…, or "default" for the model's own default.
         when (val level = env["SMOKE_THINKING_LEVEL"]) {
@@ -71,7 +79,7 @@ class GeminiLiveSmokeTest {
             } catch (e: ApiException) {
                 e.code.name
             }
-            println("PHOTO-SMOKE | $name | ${bytes.size / 1024} KB | ${(System.nanoTime() - started) / 1_000_000} ms | $outcome")
+            println("PHOTO-SMOKE | ${config.geminiPhotoModel} | $name | ${bytes.size / 1024} KB | ${(System.nanoTime() - started) / 1_000_000} ms | $outcome")
         }
     }
 
@@ -101,10 +109,10 @@ class GeminiLiveSmokeTest {
             item(3, CostLevel.SAVES_MONEY, Effort.MEDIUM, InterventionType.REDUCE),
             item(4, CostLevel.FREE, Effort.LOW, InterventionType.REUSE),
         ).map { it.copy(title = "Refill station for shampoo #${it.code.takeLast(1)}", description = "Bring an old bottle to a refill station.") }
-        val engine = LibraryInterventionEngine(FakeLibrary(library), client, taxonomy)
+        val engine = LibraryInterventionEngine(FakeLibrary(library), interventionClient, taxonomy)
         val started = System.nanoTime()
         val picks = engine.recommend(input())
-        println("SELECTION-SMOKE | ${(System.nanoTime() - started) / 1_000_000} ms | $picks")
+        println("SELECTION-SMOKE | ${config.geminiInterventionModel} | ${(System.nanoTime() - started) / 1_000_000} ms | $picks")
         assertTrue(picks.isNotEmpty())
     }
 

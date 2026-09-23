@@ -34,6 +34,24 @@ No real photos yet. The synthetic image is a blue card with the text "Hello, Men
 
 Also seen: one `429 RESOURCE_EXHAUSTED` (free-tier quota, from many calls in a row) and one transient `IOException`. Both become `422 ANALYSIS_FAILED`, and a retry worked.
 
+### 2026-09-24: free-tier quotas, switch to the lite models
+
+The team stays on the free tier. The key's limits (AI Studio → Rate limits): `gemini-3.6-flash` **5 RPM / 20 RPD**,
+too few for even one day of testing. `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite` **15 RPM / 500 RPD each**,
+and quotas are per model. So photos use `3.5-flash-lite` and recommendations `3.1-flash-lite`, behind an in-app
+throttle (`GeminiRateLimiter`). Gemini was overloaded that night (503s, slower than on 9/23):
+
+| Model | Thinking | Photo | Intervention selection |
+|---|---|---|---|
+| **`gemini-3.5-flash-lite`** | **minimal (chosen)** | **`NOT_WASTE`, 1.9 s** | — |
+| `gemini-3.5-flash-lite` | low | — | valid Gemini pick and note, 6.1 s |
+| `gemini-3.1-flash-lite` | low | — | 503, then timed out at 8 s twice → rules |
+| `gemini-3.1-flash-lite` | model default | — | 503 → rules |
+| **`gemini-3.1-flash-lite`** | **minimal (chosen)** | — | **valid Gemini picks and note, 6.4 s** |
+
+Staging on 2026-09-23 with `gemini-3.6-flash`: a real PET bottle photo → "Water PET bottle", `REC_PET_BOTTLES`, 1,
+confidence 0.9, 4.9 s (after one failed try).
+
 ### Real photos: TO DO (human)
 
 Required by the plan: at least a sachet, a PET bottle, and leftover rice. Also worth trying: a pile of mixed waste, a sando bag, a styro box, a dark or blurry photo, and a non-waste photo (a room, a plate of food still being eaten).

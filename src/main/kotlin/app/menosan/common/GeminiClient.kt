@@ -36,6 +36,9 @@ interface GeminiClient {
      * Throws [GeminiException] on any error or timeout, and callers fall back (§6.2) or map to ANALYSIS_FAILED.
      */
     suspend fun generateJson(request: GeminiRequest): String
+
+    /** How long [generateJson] may wait for a rate-limit slot before calling Gemini ([ThrottledGeminiClient]). */
+    val maxQueueWait: Duration get() = Duration.ZERO
 }
 
 object StubGeminiClient : GeminiClient {

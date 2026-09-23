@@ -54,7 +54,10 @@ class AppConfigTest {
         val config = AppConfig.from(required)
         assertEquals(AppEnv.DEV, config.appEnv)
         assertEquals(8080, config.port)
-        assertEquals(AppConfig.DEFAULT_GEMINI_MODEL, config.geminiModel)
+        assertEquals(AppConfig.DEFAULT_GEMINI_PHOTO_MODEL, config.geminiPhotoModel)
+        assertEquals(AppConfig.DEFAULT_GEMINI_INTERVENTION_MODEL, config.geminiInterventionModel)
+        assertEquals(AppConfig.DEFAULT_GEMINI_RPM, config.geminiRpm)
+        assertEquals(AppConfig.DEFAULT_GEMINI_RPD, config.geminiRpd)
         assertFalse(config.devToolsEnabled)
         assertNull(config.clockOverride)
         assertNull(config.databaseUser)
@@ -85,12 +88,12 @@ class AppConfigTest {
     @Test
     fun `real environment wins over dotenv file`() {
         val file: File = Files.createTempFile("menosan", ".env").toFile().apply {
-            writeText(required.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\nPORT=1111\nGEMINI_MODEL=from-file\n")
+            writeText(required.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\nPORT=1111\nGEMINI_PHOTO_MODEL=from-file\n")
             deleteOnExit()
         }
         val config = AppConfig.load(env = mapOf("PORT" to "2222"), dotEnvFile = file)
         assertEquals(2222, config.port)
-        assertEquals("from-file", config.geminiModel)
+        assertEquals("from-file", config.geminiPhotoModel)
     }
 
     @Test
@@ -116,5 +119,37 @@ class AppConfigTest {
         assertFalse(config.toString().contains("super-secret-key"))
         assertFalse(config.toString().contains("e30="))
         assertFalse(config.toString().contains("pooled"))
+    }
+
+    @Test
+    fun `Gemini models and limits can be set per environment`() {
+        val config = AppConfig.from(
+            required + mapOf(
+                "GEMINI_PHOTO_MODEL" to "photo-model",
+                "GEMINI_INTERVENTION_MODEL" to "intervention-model",
+                "GEMINI_RPM" to "5",
+                "GEMINI_RPD" to "20",
+            ),
+        )
+        assertEquals("photo-model", config.geminiPhotoModel)
+        assertEquals("intervention-model", config.geminiInterventionModel)
+        assertEquals(5, config.geminiRpm)
+        assertEquals(20, config.geminiRpd)
+    }
+
+    @Test
+    fun `Gemini limits must be positive whole numbers`() {
+        for (bad in listOf("0", "-1", "ten", "2.5")) {
+            val e = assertFailsWith<ConfigException> { AppConfig.from(required + ("GEMINI_RPM" to bad)) }
+            assertEquals("GEMINI_RPM must be a positive whole number", e.message)
+        }
+        assertFailsWith<ConfigException> { AppConfig.from(required + ("GEMINI_RPD" to "0")) }
+    }
+
+    @Test
+    fun `the old GEMINI_MODEL variable is ignored with a warning`() {
+        val config = AppConfig.from(required + ("GEMINI_MODEL" to "gemini-3.6-flash"))
+        assertEquals(AppConfig.DEFAULT_GEMINI_PHOTO_MODEL, config.geminiPhotoModel)
+        assertTrue(config.warnings.any { it.startsWith("GEMINI_MODEL is no longer used") })
     }
 }

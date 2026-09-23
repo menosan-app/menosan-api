@@ -7,9 +7,11 @@ import app.menosan.account.createAccountRoute
 import app.menosan.account.deleteAccountRoute
 import app.menosan.account.meRoutes
 import app.menosan.common.GeminiClient
+import app.menosan.common.GeminiRateLimiter
 import app.menosan.common.GenAiGeminiClient
 import app.menosan.common.OverridableClock
 import app.menosan.common.StubGeminiClient
+import app.menosan.common.ThrottledGeminiClient
 import app.menosan.common.weekRoutes
 import app.menosan.config.AppConfig
 import app.menosan.config.ConfigException
@@ -53,6 +55,8 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import org.slf4j.LoggerFactory
 import kotlin.system.exitProcess
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 private val log = LoggerFactory.getLogger("app.menosan.Application")
 
@@ -73,8 +77,15 @@ fun main() {
     val dataSource = createDataSource(config)
     val db = Db.connect(dataSource)
     val taxonomy = Taxonomy.loadDefault()
-    val gemini: GeminiClient = config.geminiApiKey?.let { GenAiGeminiClient(it, config.geminiModel) }
-        ?: StubGeminiClient.also { log.warn("GEMINI_API_KEY is not set: photo analysis fails and recommendations use rules") }
+    // One client and one rate limiter per model: each model has its own free-tier quota.
+    fun geminiFor(model: String, maxQueueWait: Duration): GeminiClient = config.geminiApiKey?.let { key ->
+        ThrottledGeminiClient(GenAiGeminiClient(key, model), GeminiRateLimiter(config.geminiRpm, config.geminiRpd), maxQueueWait)
+    } ?: StubGeminiClient
+    if (config.geminiApiKey == null) log.warn("GEMINI_API_KEY is not set: photo analysis fails and recommendations use rules")
+    // The user waits on a photo, so it gives up sooner. Report generation runs one call at a time, so it never
+    // waits longer than one 4 s gap unless several reports are generated at once.
+    val photoGemini = geminiFor(config.geminiPhotoModel, maxQueueWait = 6.seconds)
+    val gemini = geminiFor(config.geminiInterventionModel, maxQueueWait = 20.seconds)
     val interventions: InterventionEngine = LibraryInterventionEngine(ExposedInterventionRepository(db), gemini, taxonomy)
     val tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64)
     val entries = ExposedEntryRepository(db)
@@ -91,7 +102,7 @@ fun main() {
         entries = entries,
         accountDeletion = AccountDeletionService(db, FirebaseAdminUsers(tokenVerifier.auth)),
         exporter = ExposedDataExporter(db, clock),
-        photoAnalyzer = GeminiPhotoAnalyzer(gemini, taxonomy, clock),
+        photoAnalyzer = GeminiPhotoAnalyzer(photoGemini, taxonomy, clock),
         reports = reports,
         interventions = interventions,
         gemini = gemini,

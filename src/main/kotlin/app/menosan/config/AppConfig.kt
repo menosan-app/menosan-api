@@ -19,7 +19,13 @@ class AppConfig(
     val firebaseProjectId: String,
     val firebaseServiceAccountJsonB64: String,
     val geminiApiKey: String?,
-    val geminiModel: String,
+    /** Model for photo analysis (BE-2). Each model has its own free-tier quota, so photos and interventions use two. */
+    val geminiPhotoModel: String,
+    /** Model for intervention selection (BE-4). */
+    val geminiInterventionModel: String,
+    /** Requests per minute and per day allowed for each model, matching the key's quota ([app.menosan.common.GeminiRateLimiter]). */
+    val geminiRpm: Int,
+    val geminiRpd: Int,
     val jobKey: String?,
     val devToolsEnabled: Boolean,
     val clockOverride: Instant?,
@@ -27,7 +33,9 @@ class AppConfig(
     val warnings: List<String>,
 ) {
     override fun toString(): String =
-        "AppConfig(appEnv=$appEnv, port=$port, firebaseProjectId=$firebaseProjectId, geminiModel=$geminiModel, " +
+        "AppConfig(appEnv=$appEnv, port=$port, firebaseProjectId=$firebaseProjectId, " +
+            "geminiPhotoModel=$geminiPhotoModel, geminiInterventionModel=$geminiInterventionModel, " +
+            "geminiRpm=$geminiRpm, geminiRpd=$geminiRpd, " +
             "devToolsEnabled=$devToolsEnabled, clockOverride=$clockOverride, secrets=<redacted>)"
 
     companion object {
@@ -37,7 +45,12 @@ class AppConfig(
             "FIREBASE_PROJECT_ID",
             "FIREBASE_SERVICE_ACCOUNT_JSON_B64",
         )
-        const val DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+        // Free tier per model (AI Studio, 2026-09-24): both lite models allow 15 RPM and 500 RPD;
+        // gemini-3.6-flash allows only 5 and 20. Separate models give photos and interventions separate quotas.
+        const val DEFAULT_GEMINI_PHOTO_MODEL = "gemini-3.5-flash-lite"
+        const val DEFAULT_GEMINI_INTERVENTION_MODEL = "gemini-3.1-flash-lite"
+        const val DEFAULT_GEMINI_RPM = 15
+        const val DEFAULT_GEMINI_RPD = 500
 
         /** Real environment variables win over `.env`. `.env` is never read when APP_ENV=prod. */
         fun load(env: Map<String, String> = System.getenv(), dotEnvFile: File = File(".env")): AppConfig {
@@ -66,6 +79,13 @@ class AppConfig(
             val devTools = opt("DEV_TOOLS_ENABLED").toBool()
             if (devTools && appEnv == AppEnv.PROD) warnings += "DEV_TOOLS_ENABLED is ignored in prod"
 
+            fun positiveInt(name: String, default: Int): Int = opt(name)?.let {
+                it.toIntOrNull()?.takeIf { n -> n > 0 } ?: throw ConfigException("$name must be a positive whole number")
+            } ?: default
+            if (opt("GEMINI_MODEL") != null) {
+                warnings += "GEMINI_MODEL is no longer used; set GEMINI_PHOTO_MODEL and GEMINI_INTERVENTION_MODEL, or leave them unset"
+            }
+
             var clockOverride: Instant? = null
             opt("CLOCK_OVERRIDE")?.let { raw ->
                 if (appEnv == AppEnv.PROD) {
@@ -89,7 +109,10 @@ class AppConfig(
                 firebaseProjectId = opt("FIREBASE_PROJECT_ID")!!,
                 firebaseServiceAccountJsonB64 = opt("FIREBASE_SERVICE_ACCOUNT_JSON_B64")!!,
                 geminiApiKey = opt("GEMINI_API_KEY"),
-                geminiModel = opt("GEMINI_MODEL") ?: DEFAULT_GEMINI_MODEL,
+                geminiPhotoModel = opt("GEMINI_PHOTO_MODEL") ?: DEFAULT_GEMINI_PHOTO_MODEL,
+                geminiInterventionModel = opt("GEMINI_INTERVENTION_MODEL") ?: DEFAULT_GEMINI_INTERVENTION_MODEL,
+                geminiRpm = positiveInt("GEMINI_RPM", DEFAULT_GEMINI_RPM),
+                geminiRpd = positiveInt("GEMINI_RPD", DEFAULT_GEMINI_RPD),
                 jobKey = opt("JOB_KEY"),
                 devToolsEnabled = devTools && appEnv != AppEnv.PROD,
                 clockOverride = clockOverride,

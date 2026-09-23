@@ -4,6 +4,64 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-24 03:10 PHT (Gemini free-tier throttle)
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-2/BE-4 maintenance: Gemini on the free tier
+- **Branch:** `main` (committed, **not pushed**)
+- **Overall state:** 🟢 211 tests: 207 pass, 4 skipped (env-gated), `buildFatJar` OK. Live-checked both lite models.
+
+## 2. Done this session
+- [x] Diagnosis on staging: the 5/7 fallbacks and the failed photo were `GeminiException`s. `0395102` (pushed) made the logs show the HTTP code and status.
+- [x] Team decision: **stay on the free tier.** Key limits: `gemini-3.6-flash` 5 RPM / 20 RPD. `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite`: 15 RPM / 500 RPD **each**.
+- [x] Photos → `gemini-3.5-flash-lite`, interventions → `gemini-3.1-flash-lite`. New env vars `GEMINI_PHOTO_MODEL`, `GEMINI_INTERVENTION_MODEL`, `GEMINI_RPM`, `GEMINI_RPD` with those defaults. `GEMINI_MODEL` is dropped (startup warning if set).
+- [x] `common/GeminiThrottle.kt`: `GeminiRateLimiter` (calls spaced 60 s / RPM apart, RPD per Pacific-time day) and `ThrottledGeminiClient` (max queue wait: photo 6 s, interventions 20 s). `GeminiClient.maxQueueWait` is added to the callers' timeouts. Wired in `main()`, one client and one limiter per model.
+- [x] `thinkingLevel=minimal` for Gemini 3 lite models (`low` timed out on `3.1-flash-lite`).
+- [x] Tests: `GeminiThrottleTest` (6), new cases in `AppConfigTest`, `GeminiPhotoAnalyzerTest` (a queue wait doesn't eat the timeout), and `GenAiGeminiClientTest`. The live smoke test now uses the two configured models.
+- [x] Docs: `ENVIRONMENTS.md` §2, `.env.example`, `photo-smoke.md` (2026-09-24 table), 4 DECISIONS lines (including the privacy-notice line for Android).
+- [x] Local `.env`: `GEMINI_MODEL` replaced by the two model variables.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Deploy to staging | Render | Push `main`. In Render → `menosan-api-staging` → Environment, **delete `GEMINI_MODEL`** (the defaults then apply). |
+
+## 4. Next steps (in order)
+1. Push, delete `GEMINI_MODEL` on staging, and check the startup log: `AppConfig(… geminiPhotoModel=gemini-3.5-flash-lite, geminiInterventionModel=gemini-3.1-flash-lite, geminiRpm=15, geminiRpd=500 …)`.
+2. Re-run a staging seed and a photo analysis, then read any `Gemini …` log lines. `503 UNAVAILABLE` was common on the night of 9/24; the fallbacks handle it.
+3. If lite-model selections often take more than 8 s on staging, consider raising the 8 s intervention timeout (plan §6.2). That's a deviation, so log it in DECISIONS.
+4. Real-photo smoke on `3.5-flash-lite` (`docs/photo-smoke.md`, human).
+5. Tell Android (AN-4): the privacy notice must mention free-tier Gemini data use (DECISIONS 2026-09-24).
+6. Carried over: create prod before 9/27, rotate the Firebase key, and the staging e2e run.
+
+## 5. Verify the current state
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+./gradlew cleanTest test buildFatJar      # 211 tests, 4 skipped
+GEMINI_LIVE_TEST=true ./gradlew cleanTest test --tests '*GeminiLiveSmokeTest*'   # uses ~3 free-tier calls
+grep -oE '(PHOTO|SELECTION)-SMOKE[^<]*|Gemini (call|intervention)[^<]*' build/test-results/test/TEST-app.menosan.photo.GeminiLiveSmokeTest.xml
+```
+
+## 6. Known issues / failing tests
+- None failing.
+- Gemini was overloaded during the live check (503s, 6 s selections versus 1.5 s on 9/23). Lite-model selection can come close to the 8 s timeout on a bad night.
+- The throttle is per instance and in memory, and a restart forgets the day's count. Staging on Free restarts on every wake-up. **If staging and prod share one Gemini key/project, they share its quota.** Give prod its own key (a different Google Cloud project) when it's created.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- Free tier, two lite models, in-app throttle, `minimal` thinking on lite models, privacy-notice requirement.
+
+## 8. API contract changes
+- None. `ANALYSIS_FAILED` and the rules fallback already cover a refused slot. Photo analysis can now take up to about 6 s more when the queue is busy.
+
+## 9. Environment / setup notes
+- New env vars (all optional): `GEMINI_PHOTO_MODEL`, `GEMINI_INTERVENTION_MODEL`, `GEMINI_RPM`, `GEMINI_RPD`. Remove `GEMINI_MODEL` everywhere.
+
+## 10. Questions / blockers for humans
+- A separate Gemini key (Google Cloud project) for prod, so testers' real use isn't shared with staging's quota.
+
+---
+
 # Handoff — menosan-api — 2026-09-24 02:10 PHT (staging deployed)
 
 ## 1. Session

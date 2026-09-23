@@ -34,8 +34,10 @@ class GenAiGeminiClientTest {
     }
 
     @Test
-    fun `Gemini 3 models get a low thinking level, older models are left alone`() {
+    fun `Gemini 3 models get a short thinking level, older models are left alone`() {
         assertEquals("low", GenAiGeminiClient.defaultThinkingLevel("gemini-3.6-flash"))
+        assertEquals("minimal", GenAiGeminiClient.defaultThinkingLevel("gemini-3.5-flash-lite"))
+        assertEquals("minimal", GenAiGeminiClient.defaultThinkingLevel("gemini-3.1-flash-lite"))
         assertEquals(null, GenAiGeminiClient.defaultThinkingLevel("gemini-2.5-flash"))
         val config = GenAiGeminiClient.buildConfig(request(PhotoPrompt.responseSchema(taxonomy)), "low")
         assertEquals("low", config.thinkingConfig().get().thinkingLevel().get().toString().lowercase())

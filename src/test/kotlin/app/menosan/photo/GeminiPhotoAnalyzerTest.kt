@@ -2,6 +2,8 @@ package app.menosan.photo
 
 import app.menosan.common.ApiException
 import app.menosan.common.GeminiException
+import app.menosan.common.GeminiRateLimiter
+import app.menosan.common.ThrottledGeminiClient
 import app.menosan.fixedClock
 import app.menosan.interventions.FakeGemini
 import app.menosan.taxonomy.Taxonomy
@@ -18,7 +20,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class GeminiPhotoAnalyzerTest {
     private val taxonomy = Taxonomy.loadDefault()
@@ -138,6 +142,18 @@ class GeminiPhotoAnalyzerTest {
         val timedOut = assertFailsWith<ApiException> { analyzer(slow).analyze(alice, image, "image/jpeg") }
         assertEquals("ANALYSIS_FAILED", timedOut.code.name)
         assertTrue((System.nanoTime() - started) / 1_000_000 < 3_000, "the timeout must cut the call short")
+    }
+
+    @Test
+    fun `waiting for a free-tier slot doesn't count against the Gemini timeout`() = runBlocking {
+        // One call every 150 ms. The first slot is taken, so the analysis waits ~150 ms, then Gemini takes 150 ms:
+        // 300 ms in all, more than the 200 ms timeout, which covers only the Gemini call itself.
+        val limiter = GeminiRateLimiter(perMinute = 400, perDay = 500)
+        limiter.acquire(Duration.ZERO)
+        val throttled = ThrottledGeminiClient(FakeGemini { delay(150); answer() }, limiter, maxQueueWait = 1.seconds)
+        val suggestion = GeminiPhotoAnalyzer(throttled, taxonomy, clock, timeout = 200.milliseconds, limiter = DailyRateLimiter(30, clock))
+            .analyze(alice, image, "image/jpeg")
+        assertEquals("RES_SACHETS", suggestion.subcategory)
     }
 
     @Test

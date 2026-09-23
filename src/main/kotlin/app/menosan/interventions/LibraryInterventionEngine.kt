@@ -43,7 +43,7 @@ class LibraryInterventionEngine(
     ): List<GeminiPick>? {
         val request = GeminiSelection.request(input, taxonomy, candidates, ranked, slots, timeout)
         val raw = try {
-            withTimeoutOrNull(timeout) { gemini.generateJson(request) }
+            withTimeoutOrNull(timeout + gemini.maxQueueWait) { gemini.generateJson(request) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

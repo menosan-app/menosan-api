@@ -73,9 +73,15 @@ class GenAiGeminiClient(
 
         /**
          * Gemini 3 models think by default, which alone can exceed the 8 s selection timeout. Both of our tasks
-         * are classification-like, so keep thinking short. Older models reject `thinkingLevel`: leave them alone.
+         * are classification-like, so keep thinking short: `minimal` on the lite models (with `low`,
+         * gemini-3.1-flash-lite timed out on selection, 2026-09-24), `low` on the others. Older models reject
+         * `thinkingLevel`: leave them alone.
          */
-        fun defaultThinkingLevel(model: String): String? = if (model.startsWith("gemini-3")) "low" else null
+        fun defaultThinkingLevel(model: String): String? = when {
+            !model.startsWith("gemini-3") -> null
+            model.contains("-lite") -> "minimal"
+            else -> "low"
+        }
 
         private fun describe(e: Throwable): String {
             val root = generateSequence(e) { it.cause }.firstOrNull { it is com.google.genai.errors.ApiException } ?: e

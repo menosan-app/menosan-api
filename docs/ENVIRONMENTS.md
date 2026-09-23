@@ -27,7 +27,10 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 | `FIREBASE_PROJECT_ID` | `menosan-app` | `menosan-app` | `menosan-app` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON_B64` ★ | yes | yes | yes |
 | `GEMINI_API_KEY` ★ | optional | yes | yes (billing-enabled key if possible, plan §13) |
-| `GEMINI_MODEL` | `gemini-3.6-flash` | same | same |
+| `GEMINI_PHOTO_MODEL` | default `gemini-3.5-flash-lite` | don't set (default) | don't set (default) |
+| `GEMINI_INTERVENTION_MODEL` | default `gemini-3.1-flash-lite` | don't set (default) | don't set (default) |
+| `GEMINI_RPM` / `GEMINI_RPD` | default `15` / `500` (per model) | don't set, unless the key's limits differ | same |
+| `GEMINI_MODEL` | **no longer used** (startup warning if set) | **delete it** | don't set |
 | `JOB_KEY` ★ | any | `openssl rand -hex 32`, **different from prod** | `openssl rand -hex 32` |
 | `DEV_TOOLS_ENABLED` | `true` if you want them | `true` | don't set (always off in prod) |
 | `CLOCK_OVERRIDE` | empty | don't set (use `/internal/dev/clock`) | don't set |
