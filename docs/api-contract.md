@@ -228,3 +228,27 @@ Returned by `PUT /v1/entries/{id}`, `GET /v1/entries`, and `POST /v1/entries/syn
 ### 6.7 `DELETE /v1/account`
 - Needs a valid token but **not** an account, so it's safe to retry: `204` also when the Menosan account is already gone.
 - Deletes every database row of the account first, then the Firebase user. If the Firebase call fails, the response is `500 INTERNAL` (the data is already gone) and the app should retry. After `204`, the app signs out and clears local data.
+
+## 7. Clarifications (BE-2, part of v1)
+
+Additive only. They're also logged in `docs/DECISIONS.md`.
+
+### 7.1 `POST /v1/photo-analysis`
+- Request: `multipart/form-data` with one file part named `image`. Other parts are ignored. The server checks the bytes: the file must start with the JPEG marker `FF D8 FF`, whatever the part's `Content-Type` says.
+- Response `200`:
+
+```json
+{"suggestion": {"name": "Coffee 3-in-1 sachet", "category": "RESIDUAL", "subcategory": "RES_SACHETS", "quantity": 5, "confidence": 0.82},
+ "warning": "This is an AI suggestion and it can be wrong. Please check the name, category, subcategory, and quantity before saving."}
+```
+
+  - `name` is 1–60 characters, `subcategory` is a taxonomy code (Special codes included), `category` always matches it, `quantity` is 1–999, and `confidence` is 0–1. So the suggestion always passes `PUT /v1/entries/{id}` validation unchanged (with `source = "PHOTO"`).
+  - `warning` is always present (SFR9.5). Show it next to the review form.
+- Errors (`error.details` in brackets):
+  - `400 VALIDATION_FAILED` (`{"field":"image"}`): no `image` part, an empty file, a file that isn't a JPEG, or a malformed multipart body.
+  - `415 VALIDATION_FAILED` (`{"field":"image"}`): the request isn't `multipart/form-data`.
+  - `413 IMAGE_TOO_LARGE` (`{"maxBytes":2097152}`): the image is over 2 MB (2 × 1024 × 1024 bytes), or the whole body is over 2 MB + 64 KB.
+  - `422 NOT_WASTE`: the photo doesn't show household waste, or is too unclear to tell.
+  - `422 ANALYSIS_FAILED`: Gemini failed, timed out (15 s), or returned something that didn't pass validation. Retrying with the same or a clearer photo is fine. Manual logging always works.
+  - `429 RATE_LIMITED` (`{"limit":30,"resetsAt":"2026-09-30T16:00:00Z"}`): 30 analyses per user per Manila calendar day. `resetsAt` is the next Manila midnight. Every analysis that reaches Gemini counts, including `NOT_WASTE` and `ANALYSIS_FAILED`. Rejected uploads (400/413/415) don't count.
+- Nothing is stored: the image is held in memory for the Gemini call only and is never logged.

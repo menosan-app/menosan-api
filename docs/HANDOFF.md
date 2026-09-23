@@ -4,6 +4,76 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-23 (BE-2) PHT
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-2 Photo analysis (docs/DEVELOPMENT_PLAN.md §9 BE-2)
+- **Branch:** `feat/be2-photo` (worktree `D:/CCS6/Menosan/menosan-api-be2`, branched from `main` `3e84e30`, not pushed, not merged) · **Last code commit:** `0486a56 feat(photo): Gemini photo analysis endpoint and real Gemini client`
+- **Overall state:** 🟢 BE-2 code complete: **188 tests, 0 failures** (3 live tests skipped by default). Verified live against Gemini with a synthetic image. **Still open:** the manual smoke test with real photos (`docs/photo-smoke.md`, human).
+- A parallel worktree `menosan-api-be5` (`feat/be5-integration`) exists for BE-5.
+
+## 2. Done this session
+- [x] `common/GenAiGeminiClient.kt`: the real `GeminiClient` (google-genai 1.72.0, `client.async.models.generateContent(...).await()`). JSON mode + `responseSchema` (`Schema.fromJson`), per-request HTTP timeout, SDK retries off, `thinkingLevel=low` for `gemini-3*` models. Errors → `GeminiException` with type/status only. **Also feeds BE-4's `LibraryInterventionEngine`**, so recommendations now come from Gemini (`source = GEMINI`) when it answers in time.
+- [x] `photo/GeminiPhotoAnalyzer.kt`: prompt `resources/prompts/photo_analysis.txt` with `{{TAXONOMY}}` generated from `taxonomy.json`. The schema requires all fields, with `subcategory`/`category` as enums. Strict SFR8.3 validation (see DECISIONS), `NOT_WASTE`, 15 s timeout, `DailyRateLimiter` (30 per user per Manila day, in memory, `429` details `{limit, resetsAt}`).
+- [x] `photo/PhotoRoutes.kt`: `POST /v1/photo-analysis`. The raw body is capped at 2 MB + 64 KB, then the multipart is parsed in memory (`CIOMultipartDataBase`, `@OptIn(InternalAPI)`, see DECISIONS). JPEG is checked by magic bytes. 400/413/415 with `details.field = "image"`. The response is `{suggestion, warning}` (`PHOTO_WARNING`, SFR9.5).
+- [x] Wiring in `main()`: `GenAiGeminiClient` when `GEMINI_API_KEY` is set (else `StubGeminiClient` plus a startup warning), `photoAnalyzer = GeminiPhotoAnalyzer(...)`, and routes mounted inside `authenticated { }`.
+- [x] **Default model `gemini-2.5-flash` → `gemini-3.6-flash`** (`AppConfig.DEFAULT_GEMINI_MODEL`, `.env.example`). 2.5 Flash returns 404 "no longer available to new users" on the team's key. Latency comparison in `docs/photo-smoke.md`.
+- [x] Tests: `GeminiPhotoAnalyzerTest` (valid, boundaries, malformed JSON, missing fields, wrong types, unknown code, category mismatch, quantity 0/1000/2.5, name length, confidence range, Gemini error, timeout, rate limit), `PhotoRoutesTest` (happy path, auth, 2 MB boundary, 3 MB, missing/empty/non-JPEG/malformed/non-multipart, error passthrough, and an end-to-end log privacy check), `DailyRateLimiterTest` (Manila midnight), `GenAiGeminiClientTest` (both schemas parse into the SDK `Schema`, thinking config), and `GeminiLiveSmokeTest` (opt-in, `GEMINI_LIVE_TEST=true`).
+- [x] Docs: `api-contract.md` §7, a `CHANGELOG-contract.md` line, 8 `DECISIONS.md` lines, `docs/photo-smoke.md`.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Real-photo smoke test | `docs/photo-smoke.md` | **Human:** photograph a sachet, a PET bottle, and leftover rice (plus a few extras), run the live test with `PHOTO_SMOKE_DIR`, and fill in the table. Only the synthetic image has been tested so far. |
+
+## 4. Next steps (in order)
+1. **Human:** run the real-photo smoke (§3) and decide whether `gemini-3.6-flash` stays or `gemini-3.5-flash-lite` (faster) is good enough. The model is only an env var (`GEMINI_MODEL`).
+2. **Human:** update the local `.env` in `D:/CCS6/Menosan/menosan-api` (the `main` checkout): `GEMINI_MODEL=gemini-2.5-flash` → `gemini-3.6-flash`, or delete the line to use the default. The `be2` worktree's `.env` copy was already changed. Do the same for any deployed env (BE-5).
+3. **Merge** `feat/be2-photo` into `main`. Expected conflicts: only `Application.kt` (imports, `main()` wiring, route mounts) and the append-only docs tables if BE-5 merges first. Keep both sides.
+4. Open the Android `contract-change` issue for contract §7 (plan §8.4). AN-2 must: send the field `image` as a JPEG, show `warning`, handle `400/413/422 NOT_WASTE/422 ANALYSIS_FAILED/429` with friendly copy, and fall back to manual logging.
+5. Before the host runs more than one instance, move the rate limiter to the DB (needs a migration, V4+) or accept per-instance counting.
+
+## 5. Verify the current state
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # Git Bash
+./gradlew cleanTest test          # 188 tests, 0 failures, 3 skipped (live)
+./gradlew test --tests '*photo*' --tests '*GenAiGeminiClientTest*'
+GEMINI_LIVE_TEST=true ./gradlew cleanTest test --tests '*GeminiLiveSmokeTest*'   # real Gemini, needs GEMINI_API_KEY
+grep -h SMOKE build/test-results/test/TEST-app.menosan.photo.GeminiLiveSmokeTest.xml
+# Manual endpoint check (needs ./gradlew run and a real token):
+curl -s -X POST localhost:8080/v1/photo-analysis -H "Authorization: Bearer $TOKEN" -F "image=@sachets.jpg;type=image/jpeg"
+```
+- Use `cleanTest` for live runs: Gradle doesn't see env vars as test inputs and would otherwise reuse the last result.
+
+## 6. Known issues / failing tests
+- None failing.
+- Live Gemini is occasionally flaky: one `429 RESOURCE_EXHAUSTED` (free-tier quota, after many calls in a row), one transient `IOException`, and `gemini-3.8-flash` returned 503. All of these become `422 ANALYSIS_FAILED` (photo) or the rules fallback (interventions), and a retry works.
+- The rate limiter resets on restart and isn't shared between instances (DECISIONS).
+- `CIOMultipartDataBase` is Ktor internal API. A Ktor upgrade may need a small change in `PhotoRoutes.kt`. `PhotoRoutesTest` will catch it.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- Default model `gemini-3.6-flash` + `thinkingLevel=low` for Gemini 3. SDK retries off.
+- All schema fields required, taxonomy-generated enums, strict validation with no clamping.
+- In-memory 30/day per-user limit per Manila day. Every Gemini call counts.
+- JPEG only (magic bytes). 415 for non-multipart bodies.
+- Raw-body cap + in-memory multipart parsing (internal Ktor API) for correct 400/413.
+- Logs: type/status/reason only.
+
+## 8. API contract changes
+- `api-contract.md` §7 (clarifications only, no shape change to §2) + a `CHANGELOG-contract.md` line. **A human still needs to open the Android issue (label `contract-change`).**
+
+## 9. Environment / setup notes
+- No new env vars, dependencies, or migrations. `GEMINI_MODEL`'s default changed (see §4 step 2).
+- Test-only env vars: `GEMINI_LIVE_TEST=true`, `PHOTO_SMOKE_DIR`, `SMOKE_THINKING_LEVEL`.
+
+## 10. Questions / blockers for humans
+- Real-photo smoke test and model choice (§4 steps 1–2).
+- Gemini free tier: plan §13 says to use a billing-enabled key for prod (privacy and quota). We already hit a 429 in testing.
+- Carried over: hosting decision, CI check on `main`, real-token check, Android `contract-change` issues.
+
+---
+
 # Handoff — menosan-api — 2026-09-23 (merge main → BE-4) PHT
 
 ## 1. Session
