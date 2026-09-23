@@ -7,7 +7,10 @@ import app.menosan.config.AppConfig
 import app.menosan.db.DbHealthCheck
 import app.menosan.entries.EntryRepository
 import app.menosan.entries.StubEntryRepository
+import app.menosan.interventions.AdoptionService
 import app.menosan.interventions.InterventionEngine
+import app.menosan.interventions.ReportResponder
+import app.menosan.interventions.StubAdoptionService
 import app.menosan.interventions.StubInterventionEngine
 import app.menosan.photo.PhotoAnalyzer
 import app.menosan.photo.StubPhotoAnalyzer
@@ -33,4 +36,7 @@ class AppDeps(
     val reports: ReportService = StubReportService,
     val interventions: InterventionEngine = StubInterventionEngine,
     val gemini: GeminiClient = StubGeminiClient,
+    val adoptions: AdoptionService = StubAdoptionService,
+    /** Renders the report after an adoption change. BE-3 sets it; null → interim adoption-state response. */
+    val reportResponder: ReportResponder? = null,
 )
