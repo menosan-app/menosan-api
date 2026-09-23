@@ -1,0 +1,110 @@
+package app.menosan.config
+
+import java.io.File
+import java.nio.file.Files
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class AppConfigTest {
+    private val required = mapOf(
+        "DATABASE_URL" to "jdbc:postgresql://pooled/db",
+        "DATABASE_URL_DIRECT" to "jdbc:postgresql://direct/db",
+        "FIREBASE_PROJECT_ID" to "menosan-test",
+        "FIREBASE_SERVICE_ACCOUNT_JSON_B64" to "e30=",
+    )
+
+    @Test
+    fun `dotenv strips inline comments and quotes`() {
+        val parsed = DotEnv.parse(
+            """
+            # comment line
+            APP_ENV=dev        # dev | staging | prod
+            export PORT=9090
+            QUOTED="a # not a comment"
+            SINGLE='x=y'
+            URL=jdbc:postgresql://h/db?sslmode=require&user=u
+            EMPTY=
+            """.trimIndent(),
+        )
+        assertEquals("dev", parsed["APP_ENV"])
+        assertEquals("9090", parsed["PORT"])
+        assertEquals("a # not a comment", parsed["QUOTED"])
+        assertEquals("x=y", parsed["SINGLE"])
+        assertEquals("jdbc:postgresql://h/db?sslmode=require&user=u", parsed["URL"])
+        assertEquals("", parsed["EMPTY"])
+    }
+
+    @Test
+    fun `missing required variables are reported by name only`() {
+        val e = assertFailsWith<ConfigException> { AppConfig.from(mapOf("DATABASE_URL" to "secret-url")) }
+        assertTrue(e.message!!.contains("DATABASE_URL_DIRECT"))
+        assertTrue(e.message!!.contains("FIREBASE_PROJECT_ID"))
+        assertFalse(e.message!!.contains("secret-url"))
+    }
+
+    @Test
+    fun `defaults apply when optional variables are absent`() {
+        val config = AppConfig.from(required)
+        assertEquals(AppEnv.DEV, config.appEnv)
+        assertEquals(8080, config.port)
+        assertEquals(AppConfig.DEFAULT_GEMINI_MODEL, config.geminiModel)
+        assertFalse(config.devToolsEnabled)
+        assertNull(config.clockOverride)
+        assertNull(config.databaseUser)
+    }
+
+    @Test
+    fun `valid clock override is parsed outside prod`() {
+        val config = AppConfig.from(required + ("CLOCK_OVERRIDE" to "2026-10-04T00:05:00Z") + ("APP_ENV" to "staging"))
+        assertEquals(Instant.parse("2026-10-04T00:05:00Z"), config.clockOverride)
+    }
+
+    @Test
+    fun `invalid clock override is ignored with a warning`() {
+        val config = AppConfig.from(required + ("CLOCK_OVERRIDE" to "true"))
+        assertNull(config.clockOverride)
+        assertEquals(1, config.warnings.size)
+    }
+
+    @Test
+    fun `clock override and dev tools are ignored in prod`() {
+        val config = AppConfig.from(
+            required + mapOf("APP_ENV" to "prod", "CLOCK_OVERRIDE" to "2026-10-04T00:05:00Z", "DEV_TOOLS_ENABLED" to "true"),
+        )
+        assertNull(config.clockOverride)
+        assertFalse(config.devToolsEnabled)
+    }
+
+    @Test
+    fun `real environment wins over dotenv file`() {
+        val file: File = Files.createTempFile("menosan", ".env").toFile().apply {
+            writeText(required.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\nPORT=1111\nGEMINI_MODEL=from-file\n")
+            deleteOnExit()
+        }
+        val config = AppConfig.load(env = mapOf("PORT" to "2222"), dotEnvFile = file)
+        assertEquals(2222, config.port)
+        assertEquals("from-file", config.geminiModel)
+    }
+
+    @Test
+    fun `dotenv file is not read in prod`() {
+        val file: File = Files.createTempFile("menosan", ".env").toFile().apply {
+            writeText(required.entries.joinToString("\n") { "${it.key}=${it.value}" })
+            deleteOnExit()
+        }
+        assertFailsWith<ConfigException> { AppConfig.load(env = mapOf("APP_ENV" to "prod"), dotEnvFile = file) }
+    }
+
+    @Test
+    fun `toString never prints secrets`() {
+        val config = AppConfig.from(required + ("GEMINI_API_KEY" to "super-secret-key"))
+        assertFalse(config.toString().contains("super-secret-key"))
+        assertFalse(config.toString().contains("e30="))
+        assertFalse(config.toString().contains("pooled"))
+    }
+}
