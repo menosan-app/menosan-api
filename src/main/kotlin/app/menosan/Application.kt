@@ -1,7 +1,10 @@
 package app.menosan
 
+import app.menosan.account.AccountDeletionService
 import app.menosan.account.ExposedUserRepository
+import app.menosan.account.FirebaseAdminUsers
 import app.menosan.account.createAccountRoute
+import app.menosan.account.deleteAccountRoute
 import app.menosan.account.meRoutes
 import app.menosan.common.OverridableClock
 import app.menosan.common.weekRoutes
@@ -11,6 +14,11 @@ import app.menosan.db.Db
 import app.menosan.db.JdbcHealthCheck
 import app.menosan.db.createDataSource
 import app.menosan.db.migrate
+import app.menosan.entries.EntryService
+import app.menosan.entries.ExposedEntryRepository
+import app.menosan.entries.entryRoutes
+import app.menosan.export.ExposedDataExporter
+import app.menosan.export.exportRoutes
 import app.menosan.plugins.FirebaseTokenVerifier
 import app.menosan.plugins.authenticated
 import app.menosan.plugins.configureCallLogging
@@ -47,13 +55,17 @@ fun main() {
     val dataSource = createDataSource(config)
     val db = Db.connect(dataSource)
 
+    val tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64)
     val deps = AppDeps(
         config = config,
         clock = clock,
         taxonomy = Taxonomy.loadDefault(),
         dbHealth = JdbcHealthCheck(dataSource),
-        tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64),
+        tokenVerifier = tokenVerifier,
         users = ExposedUserRepository(db),
+        entries = ExposedEntryRepository(db),
+        accountDeletion = AccountDeletionService(db, FirebaseAdminUsers(tokenVerifier.auth)),
+        exporter = ExposedDataExporter(db, clock),
     )
 
     val server = embeddedServer(Netty, port = config.port, host = "0.0.0.0") { module(deps) }
@@ -67,16 +79,21 @@ fun Application.module(deps: AppDeps) {
     configureCallLogging()
     configureStatusPages()
 
+    val entryService = EntryService(deps.entries, deps.taxonomy, deps.clock, deps.reports)
+
     routing {
         healthRoutes(deps.dbHealth)
         route("/v1") {
             taxonomyRoutes(deps.taxonomy)
             authenticated(deps.tokenVerifier, deps.users, requireAccount = false) {
                 createAccountRoute(deps.users, deps.clock)
+                deleteAccountRoute(deps.accountDeletion)
             }
             authenticated(deps.tokenVerifier, deps.users) {
                 meRoutes()
                 weekRoutes(deps.clock)
+                entryRoutes(entryService, deps.clock)
+                exportRoutes(deps.exporter, deps.reports, deps.clock)
             }
         }
         notFoundFallback()

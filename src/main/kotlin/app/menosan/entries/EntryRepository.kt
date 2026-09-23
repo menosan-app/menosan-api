@@ -27,12 +27,22 @@ class WasteEntry(
 enum class UpsertOutcome { CREATED, UPDATED, OWNED_BY_OTHER_USER }
 
 /**
- * Persistence for waste entries. **Owned by BE-1**, which replaces [StubEntryRepository] and may reshape
- * this interface. Every method is scoped by `userId` (NFR2, NFR6).
+ * Persistence for waste entries. **Owned by BE-1.** Every method is scoped by `userId` (NFR2, NFR6),
+ * except [userIdsWithEntries], which the weekly job uses. Business rules (validation, timestamps,
+ * week editability) live in [EntryService]; this layer only stores rows.
  */
 interface EntryRepository {
+    /** Entries of [userId] in [weekStart], newest first (`createdAt` desc, then `id` desc). */
     suspend fun listForWeek(userId: UUID, weekStart: LocalDate): List<WasteEntry>
+
     suspend fun find(userId: UUID, id: UUID): WasteEntry?
+
+    /**
+     * Inserts [entry], or updates the row with the same id if it belongs to [userId].
+     * An update changes only `name`, `category`, `subcategoryCode`, `quantity`, `source`, and `updatedAt`:
+     * `createdAt` and `weekStart` never change. On insert, `received_at` is set to `entry.updatedAt`.
+     * An id that belongs to another user is left untouched and returns [UpsertOutcome.OWNED_BY_OTHER_USER].
+     */
     suspend fun upsert(userId: UUID, entry: WasteEntry): UpsertOutcome
 
     /** Returns true if a row was deleted. Deleting a missing id is not an error (idempotent). */
