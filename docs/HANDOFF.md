@@ -4,6 +4,71 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-23 12:30 PHT (BE-5)
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-5 Integration, dev tools, deployment (docs/DEVELOPMENT_PLAN.md §9 BE-5)
+- **Branch:** `feat/be5-integration` (worktree `D:/CCS6/Menosan/menosan-api-be5`, pushed, not merged) · **Last code commit:** `0250106 docs: environments and deployment guide, dev tools contract §5.10, staging e2e script, BE-5 decisions`
+- **Overall state:** 🟡 Code done: dev tools, e2e, and docs. **178 tests, 177 pass, 1 skipped** (the staging e2e, skipped without env vars), `buildFatJar` OK. **Not deployed:** hosting isn't decided and deploying needs a human with GCP/host credentials (§10).
+
+## 2. Done this session
+- [x] `dev/DevTools.kt` + `dev/DevRoutes.kt`: `GET/POST /internal/dev/clock`, `POST /internal/dev/seed-history`, `POST /internal/dev/reset` (new), `POST /internal/dev/reports/generate`. Mounted only when `config.devToolsEnabled` (always false in prod) and `AppDeps.devTools` is set. Every call needs `X-Job-Key` (`requireJobKey()`). Wired in `main()`. (`53eac8f`)
+- [x] `seed-history`: deterministic synthetic household weeks → reports oldest first → the top recommendation is adopted on every report except the latest → the next week logs less of it, so impacts show DECREASED. The latest report is left for testers to adopt in the app.
+- [x] Fixed a flaky BE-3 test: `WeeklyReportJobTest` "scheduler runs the job…" failed in the baseline run on `main` (a startup race, see DECISIONS). (`53eac8f`)
+- [x] E2E: `e2e/EndToEndScenario.kt` (account → week A entries → roll clock → report + adopt → closed-week edit refused → week B → roll → comparison 13→6 and impact 10→4 DECREASED → report A locked → reset + clock cleared). It runs in-process and over real HTTP in `EndToEndFlowTest`, and against staging in `StagingE2eTest` via `scripts/e2e-staging.sh`. (`4023cc7`)
+- [x] `docs/ENVIRONMENTS.md` (URLs table with TBDs, env matrix, Cloud Run deploy commands, Neon retention, cron enabling, dev-tool curl examples, e2e how-to, release-gate checklist), `api-contract.md` §5.10, CHANGELOG line, 6 BE-5 lines in DECISIONS, README link. (`0250106`)
+- [x] Local boot check of the fat JAR against Neon `dev` (port 18080, `DEV_TOOLS_ENABLED=true`): `/health` ok, `/internal/dev/clock` 401 without a key and 200 with one. It only read the clock, and no data was written.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Deploy staging + prod | `docs/ENVIRONMENTS.md` §3 | Needs the hosting decision and a human with credentials. Then fill in the URLs table (§1). |
+| Staging e2e run | `scripts/e2e-staging.sh` | Needs the staging URL, its `JOB_KEY`, and an ID token of a throwaway account (`token-helper/index.html`). |
+
+## 4. Next steps (in order)
+1. **Human:** review and merge `feat/be5-integration` into `main`. Expected conflicts are small (`AppDeps.kt`/`Application.kt`, append-only docs tables) if BE-2 merges first: keep both sides.
+2. **Human:** decide hosting (it was due Thu 9/24 noon). With Cloud Run, follow `docs/ENVIRONMENTS.md` §3: secrets, `gcloud builds submit`, deploy staging with `APP_ENV=staging` and `DEV_TOOLS_ENABLED=true`, then prod. **The first prod start applies V1–V3 to Neon `main`.**
+3. Run `scripts/e2e-staging.sh` against staging, then go through the release-gate checklist in `docs/ENVIRONMENTS.md` §8: Neon prod retention ≤ 7 days, enable `weekly-reports.yml`, send the base URLs to Android.
+4. UAT prep: have each demo tester sign in to the staging app once, then run `seed-history` for their email (ENVIRONMENTS §6).
+5. Carried over: BE-2 merge (real Gemini), the `InterventionQueries` cleanup (see the entry below), and the Android `contract-change` issues.
+
+## 5. Verify the current state
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # Git Bash
+./gradlew cleanTest test buildFatJar     # 178 tests: 177 pass, 1 skipped (StagingE2eTest without env)
+./gradlew test --tests '*DevToolsTest*' --tests '*EndToEndFlowTest*'
+E2E_BASE_URL=… E2E_JOB_KEY=… E2E_ID_TOKEN=… scripts/e2e-staging.sh   # once staging exists
+```
+- New test classes: `DevToolsTest` (7), `EndToEndFlowTest` (3), `StagingE2eTest` (1, env-gated). Fixture: `dev/DevApp.kt`, the app wired like staging on the embedded DB with the V3 library and the rules engine.
+- DB test weeks used by BE-5: 2026-04-05…04-19 (e2e over HTTP), 04-26…05-24 (dev tools), 06-07…06-21 (e2e in-process). Keep other tests out of them.
+
+## 6. Known issues / failing tests
+- None failing.
+- The dev clock is server-wide. Moving it on staging affects every tester there (documented).
+- Not verified: `docker build` (no Docker on this machine), a real deploy, and the staging e2e run.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- Two guards for dev tools (config flag + `AppDeps.devTools`) plus `X-Job-Key`, and the account is looked up by email, case-insensitively.
+- `reset` endpoint added, and `seed-history` refuses weeks that already have entries (409).
+- The seed adopts on past reports directly in the DB (no I7 window) and leaves the latest report open.
+- The e2e is Kotlin with pluggable drivers (in-process, real HTTP, staging), and on staging it uses weeks five weeks in the past.
+- Cloud Run is documented as the default: `min-instances 1` on prod, and the GitHub cron is required.
+
+## 8. API contract changes
+- `api-contract.md` §5.10: internal dev tools only (including the new `reset`), nothing the Android app calls. CHANGELOG line added. No Android issue needed.
+
+## 9. Environment / setup notes
+- No new env vars, dependencies, or migrations. Staging must set `APP_ENV=staging` and `DEV_TOOLS_ENABLED=true`, plus `JOB_KEY`.
+- New: `scripts/e2e-staging.sh` (executable, LF), `docs/ENVIRONMENTS.md`.
+
+## 10. Questions / blockers for humans
+- **Hosting decision**, then deployment by someone with credentials (GCP project `menosan-app` if Cloud Run).
+- A throwaway Google account for the staging e2e run.
+- Carried over: check the first CI run on `main`, and Neon prod retention ≤ 7 days.
+
+---
+
 # Handoff — menosan-api — 2026-09-23 (merge main → BE-4) PHT
 
 ## 1. Session
