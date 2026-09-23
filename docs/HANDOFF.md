@@ -4,6 +4,78 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-23 (BE-4) PHT
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** BE-4 Intervention library, engine, adoption (docs/DEVELOPMENT_PLAN.md §6, §9)
+- **Branch:** `feat/be4-interventions` (worktree `menosan-api-be4`, not pushed, not merged) · **Last code commit:** `829f1e4 feat(interventions): adoption endpoints with I7 window, report payload helpers, app wiring`
+- **Overall state:** 🟢 BE-4 DoD met on the branch, 86/86 tests green. Two integration points are still open with BE-2 and BE-3 (§3, §4).
+- **Note:** the session prompt said to "create and work on branch feat/be1-entries". That branch is already checked out in the `menosan-api-be1` worktree and belongs to BE-1, so BE-4 work stayed on `feat/be4-interventions`.
+
+## 2. Done this session
+- [x] `V3__seed_interventions.sql`: 59 curated items (≥ 3 per non-SPECIAL subcategory, none for SPECIAL), each with a title (≤ 60 chars), a 1–3 sentence description, and 2–4 `how_to` steps, following §6.1. Test: `InterventionLibrarySeedTest`. (`058b107`)
+- [x] `interventions/Intervention.kt`: model, `CostLevel`/`Effort`/`InterventionType` enums, `InterventionRepository` + `ExposedInterventionRepository`. (`058b107`)
+- [x] `RuleRanking` (pure): cost → effort → type → code. SAME/INCREASED adoptions are excluded unless nothing else is left, and DECREASED ones are pinned first with `continued = true`. (`1e9b3e4`)
+- [x] `GeminiSelection` + `LibraryInterventionEngine` (the real `InterventionEngine`): the prompt carries anonymized numbers only, the `responseSchema` has an enum of candidate ids, and the timeout is 8 s. Any violation rejects the whole answer and falls back to `RULES`: count outside 1–3, unknown or non-candidate id, duplicate id or rank, rank < 1, note > 200 chars, URL, blaming words, malformed JSON, error, or timeout. Short Gemini answers are padded with rule picks. Prompt: `resources/prompts/intervention_selection.txt`. Tests: `RuleRankingTest`, `LibraryInterventionEngineTest`. (`1e9b3e4`)
+- [x] Adoption: `AdoptionService` + `ExposedAdoptionService` (user-scoped, I7 window via `AdoptionWindow.isLatest`, all-or-nothing, `ON CONFLICT DO NOTHING`, baseline = the hotspot's quantity), `POST /v1/reports/{weekStart}/adoptions`, `DELETE /v1/reports/{weekStart}/adoptions/{interventionId}`. Test: `AdoptionRoutesTest` (window closed 409, idempotent, 404 for another user's or a missing report, 400 cases, auth). (`829f1e4`)
+- [x] Helpers for BE-3 in `interventions/InterventionQueries.kt` (call inside `db.tx {}`): `insertRecommendations(hotspotId, picks)`; `recommendationViews(reportId)` → `Map<hotspotId, List<RecommendationView>>` (the contract §3 recommendation shape, including `adopted`); `adoptionsForReport(reportId)` → baselines for impact and `PreviousAdoption`; `adoptedInterventionIds(reportId)`. Test: `InterventionQueriesTest`. (`829f1e4`)
+- [x] Wiring: `AppDeps.adoptions`, `AppDeps.reportResponder`. `main()` builds `LibraryInterventionEngine(ExposedInterventionRepository(db), gemini, taxonomy)` and `ExposedAdoptionService(db, clock)`. Routes are mounted in `Application.module` inside `authenticated { }`. (`829f1e4`)
+- [x] Docs: 9 BE-4 lines in `DECISIONS.md`, `api-contract.md` §5.7 (adoption clarifications, no shape change), and a `CHANGELOG-contract.md` line.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Full report as the adoption response | `AppDeps.reportResponder` | BE-3 must provide a `ReportResponder` that renders the §8.3 report. Until then the endpoints return the interim `{weekStart, adoptedInterventionIds}` (see DECISIONS). **Must be wired before the Android beta.** |
+| Real Gemini | `Application.kt` `main()` (`val gemini: GeminiClient = StubGeminiClient`) | BE-2 swaps in the real client. Until then every recommendation uses `source = RULES`, which is correct fallback behavior. |
+
+## 4. Next steps (in order)
+1. **Merge order:** merge BE-1/BE-2/BE-3 and this branch into `main` one at a time. Expected conflicts are only in `AppDeps.kt` and `Application.kt` (additive params and route mounts), so keep both sides. If another branch also added a `V3`, renumber this file **before** it is applied to Neon (it isn't applied anywhere yet).
+2. **BE-3 integration (whoever merges second):**
+   - In `ReportService` generation step 5, for each hotspot call `deps.interventions.recommend(RecommendationInput(HotspotInput(code, criteria, f, q), analyzedTotalQuantity, previousAdoptions))` **outside** the DB transaction. Build `previousAdoptions` from `adoptionsForReport(reportW−1Id)` plus W's impact result per adoption (`PreviousAdoption(interventionId, targetSubcategory, result)`). Then call `insertRecommendations(hotspotId, picks)` inside the persist transaction.
+   - On regeneration (§5.6), only new hotspots need `recommend()`. Adoptions reference `(report_id, intervention_id)`, so they survive.
+   - In `GET /v1/reports/{weekStart}`, fill `hotspots[].recommendations` from `recommendationViews(reportId)[hotspotId] ?: emptyList()`, fill `adoptedCount` in the list from `adoptedInterventionIds`, and use `AdoptionWindow.isLatest(weekStart, clock)` for `isLatest`.
+   - In `main()`, set `reportResponder = ReportResponder { call, userId, weekStart -> call.respond(<full report>) }`. Then change the `AdoptionRoutesTest` assertions that use `adoptedIds()` (which reads the interim body) to read `hotspots[].recommendations[].adopted`.
+3. **BE-2 integration:** replace `StubGeminiClient` in `main()` with the real client. The engine already passes `systemInstruction`, `responseSchemaJson`, and `timeout = 8s`.
+4. Human tone review of the library copy (plan §11, Fri 9/25): read `V3__seed_interventions.sql`. Content fixes after it is applied to Neon need a **new** migration (`UPDATE interventions … WHERE code = …`).
+5. BE-5 e2e: seed history → report → adopt → roll the week → impact.
+
+## 5. Verify the current state
+```bash
+# Windows without a JDK on PATH (Git Bash): export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+./gradlew test    # 86 tests, 0 failures
+```
+- New test classes: `InterventionLibrarySeedTest` (5), `RuleRankingTest` (6), `LibraryInterventionEngineTest` (16), `AdoptionRoutesTest` (11), `InterventionQueriesTest` (2).
+- Manual check (needs a report row, so only after BE-3 or BE-5 seeding): `POST /v1/reports/<latest Sunday>/adoptions {"interventionIds":["<id from the report>"]}` → 200.
+
+## 6. Known issues / failing tests
+- None failing.
+- The adoption response is interim until BE-3 wires `reportResponder` (§3). Android must not build against the interim body.
+- Adoption doesn't run lazy report catch-up. A report row that doesn't exist yet → 404. Clients always GET the report first (which runs catch-up), so this is fine.
+
+## 7. Decisions made (also logged in docs/DECISIONS.md)
+- SAME/INCREASED adoptions are excluded (not just moved down) unless nothing else is left. A null result is neutral.
+- DECREASED adoptions are pinned first (`continued`, `RULES`, no note). Gemini fills the remaining slots.
+- 1–2 Gemini picks are padded with rule picks up to 3.
+- Notes with blaming words are rejected (→ fallback). Blank notes become null.
+- Adoption errors: 400 for a bad request shape or ids not on the report (all-or-nothing), 404 for a missing or foreign report, 409 outside the window. Max 9 ids. Idempotent both ways.
+- Baseline = the hotspot's quantity at adoption time.
+
+## 8. API contract changes
+- `api-contract.md` §5.7 clarifies adoption validation, errors, and idempotency (no shape change). `CHANGELOG-contract.md` has a new line. **A human still needs to open the Android issue (label `contract-change`).**
+
+## 9. Environment / setup notes
+- Migration added: `V3__seed_interventions.sql` (not applied to Neon yet). **Once applied, never edit it.**
+- Resource added: `prompts/intervention_selection.txt`.
+- No new env vars or dependencies.
+
+## 10. Questions / blockers for humans
+- Open the Android `contract-change` issue for §5.7.
+- Review the 59 library items for tone and local fit (plan §11, Fri 9/25).
+- Still open from BE-0: the real-token check, the first CI run (push `main`), and the hosting decision (due Thu 9/24 noon).
+
+---
+
 # Handoff — menosan-api — 2026-09-23 09:05 PHT
 
 ## 1. Session

@@ -122,3 +122,12 @@ Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone"
 - Every response carries `X-Request-Id`.
 - Clients may send their own `X-Request-Id` (1–64 letters, digits, `-` or `_`), and the server echoes it back. Anything else is replaced with a server-generated UUID, and the request is never rejected because of it.
 - Include the ID in bug reports.
+
+### 5.7 Adoption (`POST /v1/reports/{weekStart}/adoptions`, `DELETE …/adoptions/{interventionId}`)
+- `weekStart` must be a Sunday date (`YYYY-MM-DD`). Anything else returns `400 VALIDATION_FAILED` with `details.field = "weekStart"`.
+- POST body: `{"interventionIds": [uuid, …]}` with 1–9 ids. An empty or missing list, more than 9 ids, or an id that isn't a UUID returns `400 VALIDATION_FAILED` with `details.field = "interventionIds"`.
+- No report for that week (including another user's report) returns `404 NOT_FOUND`.
+- The report isn't the latest one (I7: `weekStart == currentWeekStart − 7 days`) → `409 ADOPTION_WINDOW_CLOSED`. This applies to both POST and DELETE.
+- Every id must be one of the report's recommendations. Otherwise the request returns `400 VALIDATION_FAILED` (`details.field = "interventionIds"`) and nothing is adopted (all-or-nothing).
+- Both are idempotent. Adopting again keeps the original adoption and baseline, and un-adopting something that isn't adopted still returns `200`.
+- Both return `200` with the updated full report (§3), where `hotspots[].recommendations[].adopted` reflects the change.
