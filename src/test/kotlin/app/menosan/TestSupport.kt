@@ -4,6 +4,8 @@ import app.menosan.account.User
 import app.menosan.account.UserRepository
 import app.menosan.config.AppConfig
 import app.menosan.db.DbHealthCheck
+import app.menosan.photo.PhotoAnalyzer
+import app.menosan.photo.StubPhotoAnalyzer
 import app.menosan.plugins.TokenVerifier
 import app.menosan.plugins.VerifiedToken
 import app.menosan.taxonomy.Taxonomy
@@ -60,6 +62,7 @@ fun testDeps(
     clock: Clock = fixedClock("2026-09-30T04:00:00Z"),
     users: UserRepository = InMemoryUserRepository(),
     dbHealthy: Boolean = true,
+    photoAnalyzer: PhotoAnalyzer = StubPhotoAnalyzer,
 ) = AppDeps(
     config = testConfig,
     clock = clock,
@@ -72,6 +75,7 @@ fun testDeps(
         ),
     ),
     users = users,
+    photoAnalyzer = photoAnalyzer,
 )
 
 fun menosanTest(deps: AppDeps = testDeps(), block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
