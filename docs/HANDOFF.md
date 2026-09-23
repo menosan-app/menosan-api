@@ -4,6 +4,54 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-23 (merge main/BE-2 → BE-5) PHT
+
+## 1. Session
+- **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
+- **Workstream(s):** Integration: `main` (which now includes BE-2) merged into `feat/be5-integration`
+- **Branch:** `feat/be5-integration` (worktree `D:/CCS6/Menosan/menosan-api-be5`, pushed) · **Merge commit:** `8055951`. **Not merged into `main` yet**, but `main` can fast-forward to it.
+- **Overall state:** 🟢 **199 tests: 195 pass, 4 skipped** (3 live Gemini + the staging e2e, all env-gated), `buildFatJar` OK.
+
+## 2. Done this session
+- [x] Merged `main` (`df45681`, BE-2 photo analysis + real Gemini client) into BE-5. Conflicts resolved:
+  - `Application.kt`: kept BE-5's extracted `val reports` / `entries` / `devTools` and BE-2's `photoAnalyzer`, `GenAiGeminiClient`, and `photoRoutes`.
+  - `DECISIONS.md` and `CHANGELOG-contract.md`: kept every row from both sides.
+  - `HANDOFF.md`: git had interleaved the BE-2 and BE-5 entries line by line, so the file was rebuilt from both sides with each entry intact (BE-2, then BE-5, then the older entries, which were identical on both sides).
+- [x] `docs/ENVIRONMENTS.md`: `GEMINI_MODEL=gemini-2.5-flash` → `gemini-3.6-flash` in the env matrix and both Cloud Run deploy commands. The old value returns 404 for the team's key, so every photo analysis would have failed on deployed servers.
+- [x] The worktree's `.env` (a local, ignored copy) now uses `gemini-3.6-flash`.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| — | — | Nothing half-done. |
+
+## 4. Next steps (in order)
+1. **Human:** review, then fast-forward `main`: `git checkout main && git merge --ff-only feat/be5-integration && git push`.
+2. Then follow the BE-5 entry below (hosting decision → deploy → staging e2e → release-gate checklist) and the BE-2 entry (real-photo smoke test, Android `contract-change` issue for §7).
+
+## 5. Verify the current state
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"   # Git Bash
+./gradlew cleanTest test buildFatJar     # 199 tests: 195 pass, 4 skipped
+```
+
+## 6. Known issues / failing tests
+- None failing. See the BE-2 and BE-5 entries below.
+
+## 7. Decisions made
+- None new.
+
+## 8. API contract changes
+- None new. The contract now has both §5.10 (BE-5 dev tools) and §7 (BE-2 photo analysis).
+
+## 9. Environment / setup notes
+- Deployed environments must use `GEMINI_MODEL=gemini-3.6-flash`, or leave it unset for the default.
+
+## 10. Questions / blockers for humans
+- Same as the BE-2 and BE-5 entries below.
+
+---
+
 # Handoff — menosan-api — 2026-09-23 (BE-2) PHT
 
 ## 1. Session
