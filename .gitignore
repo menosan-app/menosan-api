@@ -1,0 +1,12 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+.env
+*.jks
+*service-account*.json
+.DS_Store
+AGENTS.md
+CLAUDE.md
+docs/

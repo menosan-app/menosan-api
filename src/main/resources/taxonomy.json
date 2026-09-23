@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "timezone": "Asia/Manila",
+  "categories": [
+    {
+      "code": "BIODEGRADABLE",
+      "label": "Biodegradable",
+      "analyzed": true
+    },
+    {
+      "code": "RECYCLABLE",
+      "label": "Recyclable",
+      "analyzed": true
+    },
+    {
+      "code": "RESIDUAL",
+      "label": "Residual",
+      "analyzed": true
+    },
+    {
+      "code": "SPECIAL",
+      "label": "Special",
+      "analyzed": false
+    }
+  ],
+  "subcategories": [
+    {
+      "code": "BIO_FOOD_LEFTOVERS",
+      "category": "BIODEGRADABLE",
+      "label": "Leftover cooked food",
+      "examples": [
+        "leftover rice",
+        "leftover ulam",
+        "plate waste"
+      ],
+      "avoidable": true,
+      "sortOrder": 1
+    },
+    {
+      "code": "BIO_SPOILED_FOOD",
+      "category": "BIODEGRADABLE",
+      "label": "Spoiled or expired food",
+      "examples": [
+        "rotten vegetables",
+        "expired bread",
+        "sour milk"
+      ],
+      "avoidable": true,
+      "sortOrder": 2
+    },
+    {
+      "code": "BIO_PEELS_SCRAPS",
+      "category": "BIODEGRADABLE",
+      "label": "Fruit & vegetable peels/scraps",
+      "examples": [
+        "banana peels",
+        "onion skins",
+        "fish scales",
+        "eggshells"
+      ],
+      "avoidable": false,
+      "sortOrder": 3
+    },
+    {
+      "code": "BIO_YARD_WASTE",
+      "category": "BIODEGRADABLE",
+      "label": "Yard & garden waste",
+      "examples": [
+        "dry leaves",
+        "grass",
+        "twigs"
+      ],
+      "avoidable": false,
+      "sortOrder": 4
+    },
+    {
+      "code": "BIO_OTHER",
+      "category": "BIODEGRADABLE",
+      "label": "Other biodegradable",
+      "examples": [
+        "coconut husk",
+        "other biodegradable"
+      ],
+      "avoidable": false,
+      "sortOrder": 5
+    },
+    {
+      "code": "REC_PET_BOTTLES",
+      "category": "RECYCLABLE",
+      "label": "Plastic bottles",
+      "examples": [
+        "water bottle",
+        "softdrink PET bottle",
+        "juice bottle"
+      ],
+      "avoidable": true,
+      "sortOrder": 1
+    },
+    {
+      "code": "REC_RIGID_PLASTICS",
+      "category": "RECYCLABLE",
+      "label": "Rigid plastic containers",
+      "examples": [
+        "ice cream tub",
+        "detergent bottle",
+        "food tub"
+      ],
+      "avoidable": true,
+      "sortOrder": 2
+    },
+    {
+      "code": "REC_PAPER_CARDBOARD",
+      "category": "RECYCLABLE",
+      "label": "Paper & cardboard",
+      "examples": [
+        "boxes",
+        "receipts",
+        "flyers",
+        "newspapers"
+      ],
+      "avoidable": true,
+      "sortOrder": 3
+    },
+    {
+      "code": "REC_GLASS",
+      "category": "RECYCLABLE",
+      "label": "Glass bottles & jars",
+      "examples": [
+        "softdrink bottle",
+        "sauce jar"
+      ],
+      "avoidable": true,
+      "sortOrder": 4
+    },
+    {
+      "code": "REC_METAL_CANS",
+      "category": "RECYCLABLE",
+      "label": "Metal cans",
+      "examples": [
+        "sardine can",
+        "corned beef can",
+        "softdrink can"
+      ],
+      "avoidable": false,
+      "sortOrder": 5
+    },
+    {
+      "code": "REC_OTHER",
+      "category": "RECYCLABLE",
+      "label": "Other recyclable",
+      "examples": [
+        "other recyclable"
+      ],
+      "avoidable": false,
+      "sortOrder": 6
+    },
+    {
+      "code": "RES_SACHETS",
+      "category": "RESIDUAL",
+      "label": "Sachets & small packets",
+      "examples": [
+        "shampoo sachet",
+        "3-in-1 coffee",
+        "condiment packet",
+        "detergent sachet"
+      ],
+      "avoidable": true,
+      "sortOrder": 1
+    },
+    {
+      "code": "RES_PLASTIC_BAGS",
+      "category": "RESIDUAL",
+      "label": "Plastic bags",
+      "examples": [
+        "sando bag",
+        "labo bag",
+        "ice bag"
+      ],
+      "avoidable": true,
+      "sortOrder": 2
+    },
+    {
+      "code": "RES_SNACK_WRAPPERS",
+      "category": "RESIDUAL",
+      "label": "Snack & candy wrappers",
+      "examples": [
+        "chichirya pack",
+        "biscuit wrapper",
+        "candy wrapper"
+      ],
+      "avoidable": true,
+      "sortOrder": 3
+    },
+    {
+      "code": "RES_STYROFOAM",
+      "category": "RESIDUAL",
+      "label": "Styrofoam & takeout containers",
+      "examples": [
+        "styro box",
+        "clamshell",
+        "takeout cup"
+      ],
+      "avoidable": true,
+      "sortOrder": 4
+    },
+    {
+      "code": "RES_DISPOSABLES",
+      "category": "RESIDUAL",
+      "label": "Disposable cutlery, cups & straws",
+      "examples": [
+        "plastic spoon",
+        "straw",
+        "plastic cup"
+      ],
+      "avoidable": true,
+      "sortOrder": 5
+    },
+    {
+      "code": "RES_TISSUE",
+      "category": "RESIDUAL",
+      "label": "Tissue & paper towels",
+      "examples": [
+        "tissue",
+        "table napkin",
+        "wet wipes"
+      ],
+      "avoidable": true,
+      "sortOrder": 6
+    },
+    {
+      "code": "RES_DIAPERS_SANITARY",
+      "category": "RESIDUAL",
+      "label": "Diapers & sanitary products",
+      "examples": [
+        "disposable diaper",
+        "sanitary pad"
+      ],
+      "avoidable": false,
+      "sortOrder": 7
+    },
+    {
+      "code": "RES_OTHER",
+      "category": "RESIDUAL",
+      "label": "Other residual",
+      "examples": [
+        "other residual"
+      ],
+      "avoidable": false,
+      "sortOrder": 8
+    },
+    {
+      "code": "SPC_BATTERIES",
+      "category": "SPECIAL",
+      "label": "Batteries",
+      "examples": [
+        "AA battery",
+        "button cell"
+      ],
+      "avoidable": false,
+      "sortOrder": 1
+    },
+    {
+      "code": "SPC_ELECTRONICS",
+      "category": "SPECIAL",
+      "label": "Electronic waste",
+      "examples": [
+        "charger",
+        "cable",
+        "old phone"
+      ],
+      "avoidable": false,
+      "sortOrder": 2
+    },
+    {
+      "code": "SPC_BULBS",
+      "category": "SPECIAL",
+      "label": "Light bulbs & tubes",
+      "examples": [
+        "fluorescent tube",
+        "light bulb"
+      ],
+      "avoidable": false,
+      "sortOrder": 3
+    },
+    {
+      "code": "SPC_MEDICAL",
+      "category": "SPECIAL",
+      "label": "Medical waste",
+      "examples": [
+        "expired medicine",
+        "syringe",
+        "used mask"
+      ],
+      "avoidable": false,
+      "sortOrder": 4
+    },
+    {
+      "code": "SPC_CHEMICAL",
+      "category": "SPECIAL",
+      "label": "Chemical containers",
+      "examples": [
+        "paint can",
+        "insecticide",
+        "aerosol can"
+      ],
+      "avoidable": false,
+      "sortOrder": 5
+    },
+    {
+      "code": "SPC_OTHER",
+      "category": "SPECIAL",
+      "label": "Other special waste",
+      "examples": [
+        "other special waste"
+      ],
+      "avoidable": false,
+      "sortOrder": 6
+    }
+  ]
+}
