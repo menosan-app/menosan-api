@@ -9,7 +9,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 ## 1. Session
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** BE-2/BE-4 maintenance: Gemini on the free tier
-- **Branch:** `main` (committed, **not pushed**)
+- **Branch:** `main` (pushed; staging redeployed)
 - **Overall state:** 🟢 211 tests: 207 pass, 4 skipped (env-gated), `buildFatJar` OK. Live-checked both lite models.
 
 ## 2. Done this session
@@ -28,7 +28,8 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 | Deploy to staging | Render | Push `main`. In Render → `menosan-api-staging` → Environment, **delete `GEMINI_MODEL`** (the defaults then apply). |
 
 ## 4. Next steps (in order)
-1. Push, delete `GEMINI_MODEL` on staging, and check the startup log: `AppConfig(… geminiPhotoModel=gemini-3.5-flash-lite, geminiInterventionModel=gemini-3.1-flash-lite, geminiRpm=15, geminiRpd=500 …)`.
+**Team plan (2026-09-24): finish the Android app, test every feature against staging, then create prod.** Prod must exist before testers log real weeks. If Android runs past Sun 9/27, move the testers' start date (first real report 10/11) rather than have them log on staging (Neon `dev`).
+1. ~~Push and delete `GEMINI_MODEL` on staging~~: done. Staging runs the lite models (checked by a human in the Render logs).
 2. Re-run a staging seed and a photo analysis, then read any `Gemini …` log lines. `503 UNAVAILABLE` was common on the night of 9/24; the fallbacks handle it.
 3. If lite-model selections often take more than 8 s on staging, consider raising the 8 s intervention timeout (plan §6.2). That's a deviation, so log it in DECISIONS.
 4. Real-photo smoke on `3.5-flash-lite` (`docs/photo-smoke.md`, human).
@@ -67,7 +68,7 @@ grep -oE '(PHOTO|SELECTION)-SMOKE[^<]*|Gemini (call|intervention)[^<]*' build/te
 ## 1. Session
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** BE-5 deployment: staging on Render, set up by hand
-- **Branch:** `main` (committed, **not pushed**)
+- **Branch:** `main` (pushed; staging redeployed)
 - **Overall state:** 🟢 **Staging is live** at `https://menosan-api-staging.onrender.com` (Neon `dev`, Free plan) and passed a smoke test. **Prod doesn't exist yet.**
 
 ## 2. Done this session
