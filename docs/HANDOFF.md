@@ -9,7 +9,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 ## 1. Session
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** Integration: `main` (which now includes BE-2) merged into `feat/be5-integration`
-- **Branch:** `feat/be5-integration` (worktree `D:/CCS6/Menosan/menosan-api-be5`, pushed) · **Merge commit:** `8055951`. **Not merged into `main` yet**, but `main` can fast-forward to it.
+- **Branch:** `feat/be5-integration` (worktree `D:/CCS6/Menosan/menosan-api-be5`, pushed) · **Merge commit:** `8055951`. **Fast-forwarded into `main` and pushed** (199 tests green on `main`). BE-0 through BE-5 are all on `main` now.
 - **Overall state:** 🟢 **199 tests: 195 pass, 4 skipped** (3 live Gemini + the staging e2e, all env-gated), `buildFatJar` OK.
 
 ## 2. Done this session
@@ -26,7 +26,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 | — | — | Nothing half-done. |
 
 ## 4. Next steps (in order)
-1. **Human:** review, then fast-forward `main`: `git checkout main && git merge --ff-only feat/be5-integration && git push`.
+1. ~~Fast-forward `main` to `feat/be5-integration`~~: done and pushed. **Human:** check that CI on `main` is green.
 2. Then follow the BE-5 entry below (hosting decision → deploy → staging e2e → release-gate checklist) and the BE-2 entry (real-photo smoke test, Android `contract-change` issue for §7).
 
 ## 5. Verify the current state
