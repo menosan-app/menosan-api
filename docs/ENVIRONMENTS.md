@@ -27,7 +27,7 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 | `FIREBASE_PROJECT_ID` | `menosan-app` | `menosan-app` | `menosan-app` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON_B64` ★ | yes | yes | yes |
 | `GEMINI_API_KEY` ★ | optional | yes | yes (billing-enabled key if possible, plan §13) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | same | same |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | same | same |
 | `JOB_KEY` ★ | any | random, **different from prod** | random |
 | `DEV_TOOLS_ENABLED` | `true` if you want them | `true` | ignored (always off in prod) |
 | `CLOCK_OVERRIDE` | empty | empty (use `/internal/dev/clock`) | ignored |
@@ -65,13 +65,13 @@ gcloud builds submit --tag "$IMAGE"      # builds the Dockerfile remotely (no lo
 # Staging
 gcloud run deploy menosan-api-staging --image "$IMAGE" --region asia-southeast1 --allow-unauthenticated \
   --min-instances 0 --max-instances 2 --memory 1Gi --cpu 1 \
-  --set-env-vars APP_ENV=staging,FIREBASE_PROJECT_ID=menosan-app,GEMINI_MODEL=gemini-2.5-flash,DEV_TOOLS_ENABLED=true \
+  --set-env-vars APP_ENV=staging,FIREBASE_PROJECT_ID=menosan-app,GEMINI_MODEL=gemini-3.6-flash,DEV_TOOLS_ENABLED=true \
   --set-secrets DATABASE_URL=staging-database-url:latest,DATABASE_URL_DIRECT=staging-database-url-direct:latest,JOB_KEY=staging-job-key:latest,FIREBASE_SERVICE_ACCOUNT_JSON_B64=firebase-sa-b64:latest,GEMINI_API_KEY=gemini-api-key:latest
 
 # Prod (same image, after staging passes the e2e run)
 gcloud run deploy menosan-api --image "$IMAGE" --region asia-southeast1 --allow-unauthenticated \
   --min-instances 1 --max-instances 3 --memory 1Gi --cpu 1 \
-  --set-env-vars APP_ENV=prod,FIREBASE_PROJECT_ID=menosan-app,GEMINI_MODEL=gemini-2.5-flash \
+  --set-env-vars APP_ENV=prod,FIREBASE_PROJECT_ID=menosan-app,GEMINI_MODEL=gemini-3.6-flash \
   --set-secrets DATABASE_URL=prod-database-url:latest,DATABASE_URL_DIRECT=prod-database-url-direct:latest,JOB_KEY=prod-job-key:latest,FIREBASE_SERVICE_ACCOUNT_JSON_B64=firebase-sa-b64:latest,GEMINI_API_KEY=gemini-api-key:latest
 ```
 

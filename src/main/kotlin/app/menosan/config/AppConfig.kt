@@ -37,7 +37,7 @@ class AppConfig(
             "FIREBASE_PROJECT_ID",
             "FIREBASE_SERVICE_ACCOUNT_JSON_B64",
         )
-        const val DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+        const val DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 
         /** Real environment variables win over `.env`. `.env` is never read when APP_ENV=prod. */
         fun load(env: Map<String, String> = System.getenv(), dotEnvFile: File = File(".env")): AppConfig {

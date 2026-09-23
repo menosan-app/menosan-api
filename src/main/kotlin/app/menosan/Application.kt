@@ -7,6 +7,7 @@ import app.menosan.account.createAccountRoute
 import app.menosan.account.deleteAccountRoute
 import app.menosan.account.meRoutes
 import app.menosan.common.GeminiClient
+import app.menosan.common.GenAiGeminiClient
 import app.menosan.common.OverridableClock
 import app.menosan.common.StubGeminiClient
 import app.menosan.common.weekRoutes
@@ -31,6 +32,8 @@ import app.menosan.interventions.ReportServiceResponder
 import app.menosan.interventions.adoptionRoutes
 import app.menosan.jobs.startWeeklyReportScheduler
 import app.menosan.jobs.weeklyReportJobRoute
+import app.menosan.photo.GeminiPhotoAnalyzer
+import app.menosan.photo.photoRoutes
 import app.menosan.plugins.FirebaseTokenVerifier
 import app.menosan.plugins.authenticated
 import app.menosan.plugins.configureCallLogging
@@ -70,7 +73,8 @@ fun main() {
     val dataSource = createDataSource(config)
     val db = Db.connect(dataSource)
     val taxonomy = Taxonomy.loadDefault()
-    val gemini: GeminiClient = StubGeminiClient // BE-2 replaces this with the real client
+    val gemini: GeminiClient = config.geminiApiKey?.let { GenAiGeminiClient(it, config.geminiModel) }
+        ?: StubGeminiClient.also { log.warn("GEMINI_API_KEY is not set: photo analysis fails and recommendations use rules") }
     val interventions: InterventionEngine = LibraryInterventionEngine(ExposedInterventionRepository(db), gemini, taxonomy)
     val tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64)
     val entries = ExposedEntryRepository(db)
@@ -87,6 +91,7 @@ fun main() {
         entries = entries,
         accountDeletion = AccountDeletionService(db, FirebaseAdminUsers(tokenVerifier.auth)),
         exporter = ExposedDataExporter(db, clock),
+        photoAnalyzer = GeminiPhotoAnalyzer(gemini, taxonomy, clock),
         reports = reports,
         interventions = interventions,
         gemini = gemini,
@@ -125,6 +130,7 @@ fun Application.module(deps: AppDeps) {
                 weekRoutes(deps.clock)
                 entryRoutes(entryService, deps.clock)
                 exportRoutes(deps.exporter, deps.reports, deps.clock)
+                photoRoutes(deps.photoAnalyzer)
                 reportRoutes(deps.reports)
                 adoptionRoutes(deps.adoptions, deps.reportResponder ?: ReportServiceResponder(deps.reports))
             }
