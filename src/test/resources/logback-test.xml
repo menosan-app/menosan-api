@@ -1,0 +1,19 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%-5level [%X{requestId:-}] %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="io.zonky" level="WARN"/>
+    <logger name="Exposed" level="WARN"/>
+    <logger name="org.jetbrains.exposed" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="org.flywaydb" level="WARN"/>
+    <logger name="io.ktor" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

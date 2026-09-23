@@ -46,6 +46,9 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
+    // Real PostgreSQL 17 (Neon's default major) for migration and repository tests, with no Docker or secrets.
+    testImplementation(libs.embedded.postgres)
+    testImplementation(enforcedPlatform(libs.embedded.postgres.binaries.bom))
 }
 
 tasks.test {
