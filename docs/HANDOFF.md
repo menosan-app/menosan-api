@@ -9,7 +9,7 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 ## 1. Session
 - **Agent / model:** Claude Code (Opus 5.5, `claude-opus-5-5`)
 - **Workstream(s):** BE-2 Photo analysis (docs/DEVELOPMENT_PLAN.md §9 BE-2)
-- **Branch:** `feat/be2-photo` (worktree `D:/CCS6/Menosan/menosan-api-be2`, branched from `main` `3e84e30`, not pushed, not merged) · **Last code commit:** `0486a56 feat(photo): Gemini photo analysis endpoint and real Gemini client`
+- **Branch:** `feat/be2-photo` → **fast-forwarded into `main` and pushed** (188 tests green on `main`, `buildFatJar` OK). Worktree `D:/CCS6/Menosan/menosan-api-be2` kept for follow-ups. · **Last code commit:** `0486a56 feat(photo): Gemini photo analysis endpoint and real Gemini client`
 - **Overall state:** 🟢 BE-2 code complete: **188 tests, 0 failures** (3 live tests skipped by default). Verified live against Gemini with a synthetic image. **Still open:** the manual smoke test with real photos (`docs/photo-smoke.md`, human).
 - A parallel worktree `menosan-api-be5` (`feat/be5-integration`) exists for BE-5.
 
@@ -29,9 +29,9 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ## 4. Next steps (in order)
 1. **Human:** run the real-photo smoke (§3) and decide whether `gemini-3.6-flash` stays or `gemini-3.5-flash-lite` (faster) is good enough. The model is only an env var (`GEMINI_MODEL`).
-2. **Human:** update the local `.env` in `D:/CCS6/Menosan/menosan-api` (the `main` checkout): `GEMINI_MODEL=gemini-2.5-flash` → `gemini-3.6-flash`, or delete the line to use the default. The `be2` worktree's `.env` copy was already changed. Do the same for any deployed env (BE-5).
-3. **Merge** `feat/be2-photo` into `main`. Expected conflicts: only `Application.kt` (imports, `main()` wiring, route mounts) and the append-only docs tables if BE-5 merges first. Keep both sides.
-4. Open the Android `contract-change` issue for contract §7 (plan §8.4). AN-2 must: send the field `image` as a JPEG, show `warning`, handle `400/413/422 NOT_WASTE/422 ANALYSIS_FAILED/429` with friendly copy, and fall back to manual logging.
+2. ~~Update local `.env` `GEMINI_MODEL`~~: done in both the `main` checkout and the `be2` worktree (`gemini-3.6-flash`). **BE-5:** set the same on every deployed env, or leave `GEMINI_MODEL` unset to use the default.
+3. ~~Merge `feat/be2-photo` into `main`~~: done (fast-forward, pushed). **BE-5** (`feat/be5-integration`) branched before this, so it will conflict only in `Application.kt` and the append-only docs tables. Keep both sides.
+4. **Human:** open the Android `contract-change` issue for contract §7 (plan §8.4). The GitHub CLI isn't installed on this machine, so it wasn't opened. AN-2 must: send the field `image` as a JPEG, show `warning`, handle `400/413/422 NOT_WASTE/422 ANALYSIS_FAILED/429` with friendly copy, and fall back to manual logging.
 5. Before the host runs more than one instance, move the rate limiter to the DB (needs a migration, V4+) or accept per-instance counting.
 
 ## 5. Verify the current state
