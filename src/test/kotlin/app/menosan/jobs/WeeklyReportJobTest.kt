@@ -41,7 +41,7 @@ class WeeklyReportJobTest {
 
     @Test
     fun `scheduler runs the job once the clock passes the run time`() {
-        val clock = OverridableClock().apply { setOverride(Instant.parse("2026-10-03T16:04:59.850Z")) }
+        val clock = OverridableClock()
         val runs = AtomicInteger()
         val reports = object : ReportService by StubReportService {
             override suspend fun generateMissing(weekStart: LocalDate?): Int {
@@ -51,7 +51,11 @@ class WeeklyReportJobTest {
             }
         }
         testApplication {
-            application { startWeeklyReportScheduler(clock, reports, pollInterval = 20.milliseconds) }
+            application {
+                // Set just before the scheduler reads it: if app startup ate the margin, it would wait a week.
+                clock.setOverride(Instant.parse("2026-10-03T16:04:59Z"))
+                startWeeklyReportScheduler(clock, reports, pollInterval = 20.milliseconds)
+            }
             startApplication()
             withTimeout(5_000) { while (runs.get() == 0) delay(10) }
         }

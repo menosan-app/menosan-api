@@ -7,6 +7,7 @@ import app.menosan.common.GeminiClient
 import app.menosan.common.StubGeminiClient
 import app.menosan.config.AppConfig
 import app.menosan.db.DbHealthCheck
+import app.menosan.dev.DevTools
 import app.menosan.entries.EntryRepository
 import app.menosan.entries.StubEntryRepository
 import app.menosan.export.DataExporter
@@ -45,4 +46,6 @@ class AppDeps(
     val adoptions: AdoptionService = StubAdoptionService,
     /** Response after an adoption change. Null → the full report from [reports] (`ReportServiceResponder`). */
     val reportResponder: ReportResponder? = null,
+    /** `/internal/dev/...` (BE-5). Mounted only when this is set **and** `config.devToolsEnabled` (never in prod). */
+    val devTools: DevTools? = null,
 )

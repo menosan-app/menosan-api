@@ -16,6 +16,8 @@ import app.menosan.db.Db
 import app.menosan.db.JdbcHealthCheck
 import app.menosan.db.createDataSource
 import app.menosan.db.migrate
+import app.menosan.dev.DevTools
+import app.menosan.dev.devRoutes
 import app.menosan.entries.EntryService
 import app.menosan.entries.ExposedEntryRepository
 import app.menosan.entries.entryRoutes
@@ -71,6 +73,9 @@ fun main() {
     val gemini: GeminiClient = StubGeminiClient // BE-2 replaces this with the real client
     val interventions: InterventionEngine = LibraryInterventionEngine(ExposedInterventionRepository(db), gemini, taxonomy)
     val tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64)
+    val entries = ExposedEntryRepository(db)
+    val reports = DefaultReportService(ReportStore(db), clock, taxonomy, interventions)
+    if (config.devToolsEnabled) log.warn("Dev tools are enabled at /internal/dev (staging only)")
 
     val deps = AppDeps(
         config = config,
@@ -79,13 +84,14 @@ fun main() {
         dbHealth = JdbcHealthCheck(dataSource),
         tokenVerifier = tokenVerifier,
         users = ExposedUserRepository(db),
-        entries = ExposedEntryRepository(db),
+        entries = entries,
         accountDeletion = AccountDeletionService(db, FirebaseAdminUsers(tokenVerifier.auth)),
         exporter = ExposedDataExporter(db, clock),
-        reports = DefaultReportService(ReportStore(db), clock, taxonomy, interventions),
+        reports = reports,
         interventions = interventions,
         gemini = gemini,
         adoptions = ExposedAdoptionService(db, clock),
+        devTools = if (config.devToolsEnabled) DevTools(db, clock, taxonomy, entries, reports) else null,
     )
 
     val server = embeddedServer(Netty, port = config.port, host = "0.0.0.0") {
@@ -107,6 +113,7 @@ fun Application.module(deps: AppDeps) {
     routing {
         healthRoutes(deps.dbHealth)
         weeklyReportJobRoute(deps.config.jobKey, deps.reports, deps.clock)
+        if (deps.config.devToolsEnabled) deps.devTools?.let { devRoutes(deps.config.jobKey, it) }
         route("/v1") {
             taxonomyRoutes(deps.taxonomy)
             authenticated(deps.tokenVerifier, deps.users, requireAccount = false) {
