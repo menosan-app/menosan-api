@@ -4,6 +4,79 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-28 (prod live from the deploy repo)
+
+## 1. Session
+- **Agent / model:** Claude Code (Claude Opus 5.5)
+- **Workstream(s):** BE-5 deployment: prod
+- **Branch:** `worktree-docs-prod-deploy` (docs only). No code changes in this repo.
+- **Overall state:** 🟢 **Prod is live** at `https://menosan-api.onrender.com` and passed a smoke test.
+
+## 2. Done this session
+- [x] Reviewed a hand-made prod copy in `D:/CCS6/Menosan/menosan-api-deploy`, which another session had made. It had drifted from spec:
+  - rule ranking no longer excluded SAME/INCREASED adoptions;
+  - lazy and late-sync reports never used Gemini;
+  - `/health` was split into `/health` and `/health/db`;
+  - token revocation checks broke `DELETE /v1/account` retries;
+  - a new error code, `PAYLOAD_TOO_LARGE`;
+  - failed photo calls were refunded;
+  - there were no tests.
+
+  **The human discarded it.**
+- [x] Rebuilt that folder from `main` `687e54b`:
+  - removed tests, dev tools, stubs, `.env`, `APP_ENV`, the clock override, and `InterventionQueries.kt`;
+  - stripped comments; files are LF;
+  - added a short README.
+
+  Checks:
+  - `buildFatJar` passes;
+  - the code diff against comment-stripped `main` shows only the scaffolding removals;
+  - string literals are unchanged;
+  - migrations are byte-identical.
+
+  The human pushed it to a new GitHub repo, and Render's `menosan-api` service builds from it.
+- [x] Prod smoke test (2026-09-28):
+  - `/health` → `{"status":"ok","db":"ok"}` and `/v1/taxonomy` version 2;
+  - `/v1/me` without a token → 401, and the job endpoint without a key → 401 (so `JOB_KEY` is set);
+  - `/internal/dev/clock` → 404, and `/health/db` → 404 (so it is not the discarded copy).
+- [x] Docs: `ENVIRONMENTS.md` (§1 prod URL, §2 prod column, §3 and new §3.1 "The prod build", §8 checklist) and a DECISIONS line.
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Staging smoke test from 09-27 | staging | Still open: re-seed the demo account and run a real-photo grams check (see the entry below). |
+
+## 4. Next steps (in order)
+1. **Human:** set Neon prod history retention to 7 days or less (ENVIRONMENTS §4). Not confirmed yet.
+2. **Human:** confirm the Render service is on **Starter** with Auto-Deploy **Off** (not checked by the agent).
+3. Set Android's `prod` flavor `API_BASE_URL` to `https://menosan-api.onrender.com`. Sign in once on a prod build (real-token check), then delete that test account in the app.
+4. Optional: enable `weekly-reports.yml` in this repo for prod (ENVIRONMENTS §5). On Starter, the in-process job and lazy catch-up already cover it.
+5. Carried over: rotate the Firebase service-account key (if it wasn't rotated for prod), give prod a separate Gemini key, run the staging e2e, and do the real-photo smoke test.
+6. For future releases, change code here first, then refresh the deploy repo from `main` (§3.1).
+
+## 5. Verify the current state
+```bash
+curl -s https://menosan-api.onrender.com/health          # {"status":"ok","db":"ok"}
+curl -s -o /dev/null -w "%{http_code}\n" https://menosan-api.onrender.com/internal/dev/clock   # 404
+```
+
+## 6. Known issues
+- The deploy repo is a snapshot. Fixes merged here after `687e54b` don't reach prod until it's refreshed.
+
+## 7. Decisions (also in docs/DECISIONS.md)
+- Prod builds from a separate, trimmed deploy repo. This repo stays the source of truth.
+
+## 8. API contract changes
+- None.
+
+## 9. Environment / setup notes
+- Prod ignores `APP_ENV`, `DEV_TOOLS_ENABLED`, and `CLOCK_OVERRIDE`. Its startup line is `AppConfig(port=8080, …)`.
+
+## 10. Questions / blockers for humans
+- Neon retention and the Render plan/auto-deploy settings (§4 steps 1–2).
+
+---
+
 # Handoff — menosan-api — 2026-09-27 (food waste in grams, analytics v2)
 
 ## 1. Session

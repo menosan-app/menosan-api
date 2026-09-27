@@ -10,7 +10,7 @@ services built from the repo's `Dockerfile`, **created by hand in the Render das
 |---|---|---|---|
 | local | `http://localhost:8080` (Android emulator: `http://10.0.2.2:8080`) | `dev` | developers |
 | staging | `https://menosan-api-staging.onrender.com` (deployed 2026-09-24) | `dev` | Android `staging` flavor, UAT demo accounts, e2e |
-| prod | **not created yet** (planned: `https://menosan-api.onrender.com`) | `main` | Android `prod` flavor, testers' real weeks |
+| prod | `https://menosan-api.onrender.com` (deployed 2026-09-28) | `main` | Android `prod` flavor, testers' real weeks |
 
 Android takes these as `API_BASE_URL` per build flavor (plan §10). Send them to the Android team as soon as they exist.
 
@@ -20,7 +20,7 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 
 | Variable | local | staging | prod |
 |---|---|---|---|
-| `APP_ENV` | `dev` | `staging` (**must be set**: the image defaults to `prod`) | `prod` |
+| `APP_ENV` | `dev` | `staging` (**must be set**: the image defaults to `prod`) | not used (§3.1) |
 | `PORT` | `8080` | `8080` | `8080` |
 | `DATABASE_URL` ★ | Neon `dev` pooled | Neon `dev` pooled | Neon `main` pooled |
 | `DATABASE_URL_DIRECT` ★ | Neon `dev` direct | Neon `dev` direct | Neon `main` direct |
@@ -32,12 +32,12 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 | `GEMINI_RPM` / `GEMINI_RPD` | default `15` / `500` (per model) | don't set, unless the key's limits differ | same |
 | `GEMINI_MODEL` | **no longer used** (startup warning if set) | **delete it** | don't set |
 | `JOB_KEY` ★ | any | `openssl rand -hex 32`, **different from prod** | `openssl rand -hex 32` |
-| `DEV_TOOLS_ENABLED` | `true` if you want them | `true` | don't set (always off in prod) |
-| `CLOCK_OVERRIDE` | empty | don't set (use `/internal/dev/clock`) | don't set |
+| `DEV_TOOLS_ENABLED` | `true` if you want them | `true` | not used (§3.1) |
+| `CLOCK_OVERRIDE` | empty | don't set (use `/internal/dev/clock`) | not used (§3.1) |
 | `JAVA_TOOL_OPTIONS` | — | `-XX:TieredStopAtLevel=1` (faster JVM start on Free's small CPU) | don't set |
 
-- The app runs Flyway migrations **on every start**, against `DATABASE_URL_DIRECT`. The first prod start applies
-  V1–V3 to Neon `main`. Migrations are append-only, so this is safe to repeat.
+- The app runs Flyway migrations **on every start**, against `DATABASE_URL_DIRECT`. The first prod start
+  (2026-09-28) applied V1–V4 to Neon `main`. Migrations are append-only, so this is safe to repeat.
 - Leave out `DATABASE_USER`/`DATABASE_PASSWORD` when the JDBC URLs already carry the credentials (they do in `.env`).
 
 ## 3. Deploying (Render, by hand)
@@ -45,7 +45,7 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 | Service | Plan | Branch | Deploys | Neon |
 |---|---|---|---|---|
 | `menosan-api-staging` | **Free** | `main` | automatically, after CI checks pass | `dev` |
-| `menosan-api` (not created yet) | **Starter** (always on) | `main` | **by hand only**, after staging passes the e2e run | `main` |
+| `menosan-api` | **Starter** (always on) | the deploy repo (§3.1) | **by hand only**, after staging passes the e2e run | `main` |
 
 **Creating a service** (a human with access to the team's Render workspace):
 
@@ -56,7 +56,7 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 3. Environment: type each variable from §2 **by hand**. Don't use *Add from .env*: it keeps inline `# comments`
    as part of the value (`DEV_TOOLS_ENABLED=true # …` is not `true`). No quotes, no comments.
 4. **Create Web Service.** The first Docker build takes several minutes. In **Logs**, the startup line
-   `AppConfig(appEnv=STAGING, …)` (or `PROD`) shows the settings with secrets redacted. There must be no
+   `AppConfig(appEnv=STAGING, …)` (prod: `AppConfig(port=8080, …)`, §3.1) shows the settings with secrets redacted. There must be no
    `GEMINI_API_KEY is not set` warning. Staging also logs `Dev tools are enabled at /internal/dev`.
 5. Check it:
    - `GET /health` → `{"status":"ok","db":"ok"}`
@@ -66,7 +66,8 @@ See `.env.example` for formats. Secrets (★) go into the host's secret store, n
 
 **Each release:**
 - Staging redeploys on its own after every green push to `main`.
-- Prod: after staging passes `scripts/e2e-staging.sh`, open the `menosan-api` service → **Manual Deploy → Deploy latest commit**.
+- Prod: after staging passes `scripts/e2e-staging.sh`, refresh the deploy repo from `main` (§3.1), then open the
+  `menosan-api` service → **Manual Deploy → Deploy latest commit**.
   To roll back, use **Rollbacks** on the service page (the image of an earlier deploy).
 
 Notes:
@@ -84,6 +85,20 @@ Notes:
 - Keep **1 instance** per service: the photo rate limiter is counted per instance (`docs/DECISIONS.md`).
 - The API does its own auth (Firebase ID tokens, `X-Job-Key`), so the services are public.
 - Logs: service page → **Logs**. They never contain bodies, tokens, emails, or images (plan §14).
+
+### 3.1 The prod build (deploy repo)
+
+Prod doesn't build from this repo. It builds from a separate GitHub repo that holds a trimmed copy of this repo's
+`main`. The copy currently matches `687e54b`, as of 2026-09-28. The trimmed copy:
+- drops the tests, dev tools (`/internal/dev`), stubs, `.env` loading, `APP_ENV`, and the clock override;
+- strips the comments.
+
+It behaves like `main` with `APP_ENV=prod`. Its startup line is `AppConfig(port=8080, …)` with no `appEnv`.
+`APP_ENV`, `DEV_TOOLS_ENABLED`, and `CLOCK_OVERRIDE` do nothing there. Staging still builds from this repo.
+
+- **Never change code in the deploy repo.** Make every change here first, with tests, CI, and contract and DECISIONS updates.
+  Then re-export `main` into the deploy repo and push.
+- After each refresh, update the commit hash above.
 
 ## 4. Neon
 
@@ -141,7 +156,8 @@ PowerShell: `$env:E2E_BASE_URL="…"; $env:E2E_JOB_KEY="…"; $env:E2E_ID_TOKEN=
 - [x] Staging smoke test (2026-09-24): account create and delete, photo analysis via Gemini, `seed-history`, reports with Gemini notes
 - [ ] Staging URL sent to Android
 - [ ] `scripts/e2e-staging.sh` passes
-- [ ] Prod deployed (`APP_ENV=prod`), `GET /health` OK, `POST /internal/dev/clock` → 404
+- [x] Prod deployed from the deploy repo (§3.1, 2026-09-28). Smoke test: `GET /health` → `{"status":"ok","db":"ok"}`,
+  taxonomy version 2, `/v1/me` without a token → 401, job endpoint without a key → 401, `/internal/dev/clock` → 404
 - [ ] Neon prod retention ≤ 7 days
 - [ ] `weekly-reports.yml` enabled for prod and tested once by hand
 - [ ] Prod URL sent to Android
