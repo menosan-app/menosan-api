@@ -48,9 +48,9 @@ fun input(
     previous: List<PreviousAdoption> = emptyList(),
     frequency: Int = 12,
     quantity: Int = 40,
-    total: Int = 118,
+    total: Int = 42,
 ) = RecommendationInput(
     hotspot = HotspotInput(subcategory, listOf("MOST_FREQUENT", "AVOIDABLE"), frequency, quantity),
-    analyzedTotalQuantity = total,
+    analyzedEntries = total,
     previousAdoptions = previous,
 )

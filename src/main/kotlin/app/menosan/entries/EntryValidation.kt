@@ -1,5 +1,6 @@
 package app.menosan.entries
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.ApiException
 import app.menosan.common.ErrorCode
 import app.menosan.taxonomy.Taxonomy
@@ -38,7 +39,14 @@ class EntryInput(
 
 const val NAME_MAX_LENGTH = 60
 const val QUANTITY_MIN = 1
-const val QUANTITY_MAX = 999
+
+/** Largest quantity for one entry: 999 pieces, or 10,000 g (10 kg) for subcategories logged in grams. */
+const val QUANTITY_MAX_PIECES = 999
+const val QUANTITY_MAX_GRAMS = 10_000
+
+fun QuantityUnit.maxQuantity(): Int = if (this == QuantityUnit.GRAMS) QUANTITY_MAX_GRAMS else QUANTITY_MAX_PIECES
+
+private fun QuantityUnit.symbol(): String = if (this == QuantityUnit.GRAMS) "g" else "pieces"
 
 /** Clients may be a little ahead of the server clock (plan §4). */
 val MAX_FUTURE_SKEW: Duration = Duration.ofMinutes(5)
@@ -57,7 +65,10 @@ fun validateEntry(request: EntryPutRequest, taxonomy: Taxonomy): EntryInput {
     val category = taxonomy.categoryOf(subcategory) ?: invalid("subcategory", "Unknown subcategory.")
 
     val quantity = request.quantity ?: invalid("quantity", "Please enter a quantity.")
-    if (quantity !in QUANTITY_MIN..QUANTITY_MAX) invalid("quantity", "Quantity must be a whole number from $QUANTITY_MIN to $QUANTITY_MAX.")
+    val unit = taxonomy.unitOf(subcategory) ?: invalid("subcategory", "Unknown subcategory.")
+    if (quantity !in QUANTITY_MIN..unit.maxQuantity()) {
+        invalid("quantity", "Quantity must be a whole number from $QUANTITY_MIN to ${unit.maxQuantity()} ${unit.symbol()}.")
+    }
 
     val source = request.source?.let { s -> EntrySource.entries.firstOrNull { it.name == s } }
         ?: invalid("source", "Source must be MANUAL or PHOTO.")

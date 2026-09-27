@@ -1,5 +1,6 @@
 package app.menosan.photo
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.ApiException
 import app.menosan.common.GeminiException
 import app.menosan.common.GeminiRateLimiter
@@ -56,7 +57,7 @@ class GeminiPhotoAnalyzerTest {
     fun `a valid answer becomes a suggestion`() = runBlocking {
         val gemini = FakeGemini { answer(name = "\"  Coffee   3-in-1\\n sachet \"") }
         val suggestion = analyzer(gemini).analyze(alice, image, "image/jpeg")
-        assertEquals(PhotoSuggestion("Coffee 3-in-1 sachet", "RESIDUAL", "RES_SACHETS", 5, 0.82), suggestion)
+        assertEquals(PhotoSuggestion("Coffee 3-in-1 sachet", "RESIDUAL", "RES_SACHETS", 5, QuantityUnit.PIECES, 0.82), suggestion)
 
         val request = gemini.requests.single()
         assertContentEquals(image, request.image!!.bytes)

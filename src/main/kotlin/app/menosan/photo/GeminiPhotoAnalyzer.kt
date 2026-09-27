@@ -7,8 +7,9 @@ import app.menosan.common.GeminiImage
 import app.menosan.common.GeminiRequest
 import app.menosan.common.geminiErrorSummary
 import app.menosan.entries.NAME_MAX_LENGTH
-import app.menosan.entries.QUANTITY_MAX
+import app.menosan.entries.QUANTITY_MAX_GRAMS
 import app.menosan.entries.QUANTITY_MIN
+import app.menosan.entries.maxQuantity
 import app.menosan.taxonomy.Taxonomy
 import app.menosan.taxonomy.WasteCategory
 import kotlinx.coroutines.CancellationException
@@ -126,7 +127,7 @@ class GeminiPhotoAnalyzer(
             val quantityValue = obj.primitive("quantity")?.takeIf { !it.isString }?.doubleOrNull
                 ?: return PhotoResult.Invalid("missing quantity")
             if (quantityValue % 1.0 != 0.0) return PhotoResult.Invalid("quantity is not a whole number")
-            if (quantityValue !in QUANTITY_MIN.toDouble()..QUANTITY_MAX.toDouble()) return PhotoResult.Invalid("quantity out of range")
+            if (quantityValue !in QUANTITY_MIN.toDouble()..subcategory.unit.maxQuantity().toDouble()) return PhotoResult.Invalid("quantity out of range")
 
             val confidence = obj.primitive("confidence")?.takeIf { !it.isString }?.doubleOrNull
                 ?: return PhotoResult.Invalid("missing confidence")
@@ -138,6 +139,7 @@ class GeminiPhotoAnalyzer(
                     category = subcategory.category,
                     subcategory = subcategory.code,
                     quantity = quantityValue.toInt(),
+                    unit = subcategory.unit,
                     confidence = confidence,
                 ),
             )
@@ -168,7 +170,7 @@ internal object PhotoPrompt {
     fun systemInstruction(taxonomy: Taxonomy): String {
         check(TAXONOMY_PLACEHOLDER in template) { "photo_analysis.txt must contain $TAXONOMY_PLACEHOLDER" }
         val lines = taxonomy.subcategories.sortedWith(compareBy({ WasteCategory.valueOf(it.category).ordinal }, { it.sortOrder }))
-            .joinToString("\n") { "${it.code} | ${it.category} | ${it.label} | ${it.examples.joinToString(", ")}" }
+            .joinToString("\n") { "${it.code} | ${it.category} | ${it.label} | ${it.unit.name.lowercase()} | ${it.examples.joinToString(", ")}" }
         return template.replace(TAXONOMY_PLACEHOLDER, lines)
     }
 
@@ -192,7 +194,7 @@ internal object PhotoPrompt {
             putJsonObject("quantity") {
                 put("type", "INTEGER")
                 put("minimum", QUANTITY_MIN)
-                put("maximum", QUANTITY_MAX)
+                put("maximum", QUANTITY_MAX_GRAMS) // checked per unit in parse()
             }
             putJsonObject("confidence") {
                 put("type", "NUMBER")

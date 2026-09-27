@@ -1,5 +1,6 @@
 package app.menosan.taxonomy
 
+import app.menosan.analytics.QuantityUnit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
@@ -18,6 +19,8 @@ data class TaxonomySubcategory(
     val examples: List<String>,
     val avoidable: Boolean,
     val sortOrder: Int,
+    /** The unit quantities are logged in. Fixed per subcategory (taxonomy version 2). */
+    val unit: QuantityUnit,
 )
 
 /** The waste taxonomy from `taxonomy.json` (plan §3), the single source of truth for codes. */
@@ -32,6 +35,8 @@ data class Taxonomy(
     private val byCode: Map<String, TaxonomySubcategory> = subcategories.associateBy { it.code }
 
     fun subcategory(code: String): TaxonomySubcategory? = byCode[code]
+
+    fun unitOf(subcategoryCode: String): QuantityUnit? = byCode[subcategoryCode]?.unit
 
     fun categoryOf(subcategoryCode: String): WasteCategory? =
         byCode[subcategoryCode]?.let { WasteCategory.valueOf(it.category) }

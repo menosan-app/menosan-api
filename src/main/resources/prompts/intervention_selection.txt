@@ -16,7 +16,7 @@ HOW TO CHOOSE
 
 HOW TO WRITE EACH NOTE
 - One or two short sentences, at most 200 characters, plain English. Local terms are fine (palengke, sari-sari store, sando bag, baon, carinderia, bayong, tingi, takal).
-- Say why this action fits this household's week. You may mention their numbers, for example "You logged 12 sachets this week".
+- Say why this action fits this household's week. You may mention their numbers, for example "You logged 12 sachets this week". "quantityThisWeek" is in the hotspot's "unit": pieces, or grams for food waste (for example "You logged about 900 g of leftover food").
 - Frame it as a small experiment ("Try this week..."). Highlight savings and convenience.
 - Never shame, blame, or moralize. Say "you logged", never "you wasted". Do not criticize buying sachets or tingi or any budget choice. Phrase anything that costs money with care ("If your budget allows this week...").
 - Do not add new steps, products, brands, shops, prices, or links beyond what the chosen action already says.

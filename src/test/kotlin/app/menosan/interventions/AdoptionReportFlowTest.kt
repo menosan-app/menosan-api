@@ -57,7 +57,7 @@ class AdoptionReportFlowTest {
             config = testConfig, clock = clock, taxonomy = taxonomy, dbHealth = DbHealthCheck { true },
             tokenVerifier = FakeTokenVerifier(mapOf("t" to VerifiedToken(uid, null, null))),
             users = ExposedUserRepository(db),
-            reports = DefaultReportService(ReportStore(db), clock, taxonomy, engine),
+            reports = DefaultReportService(ReportStore(db, taxonomy), clock, taxonomy, engine),
             interventions = engine,
             adoptions = ExposedAdoptionService(db, clock),
         )

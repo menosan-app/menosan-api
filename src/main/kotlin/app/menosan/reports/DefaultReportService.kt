@@ -116,12 +116,13 @@ class DefaultReportService(
         val impacts = measureImpact(
             adoptions.map { AdoptionInput(it.interventionId.toString(), it.targetSubcategory, it.baselineQuantity) },
             stats,
+            taxonomy,
         )
         return ComputedReport(
             weekStart = weekStart,
             stats = stats,
             hotspots = findHotspots(stats, taxonomy),
-            comparison = compare(stats, previousStats, previousWeek.toString()),
+            comparison = compare(stats, previousStats, previousWeek.toString(), taxonomy),
             previousAdoptions = adoptions,
             impacts = impacts,
         )
@@ -138,8 +139,8 @@ class DefaultReportService(
         }
         return hotspots.associate { h ->
             val input = RecommendationInput(
-                hotspot = HotspotInput(h.subcategory, h.criteria.map { it.name }, h.frequency, h.quantity),
-                analyzedTotalQuantity = report.stats.analyzedTotals.quantity,
+                hotspot = HotspotInput(h.subcategory, h.criteria.map { it.name }, h.frequency, h.quantity, h.unit),
+                analyzedEntries = report.stats.analyzedTotals.frequency,
                 previousAdoptions = previous,
             )
             val picks = try {

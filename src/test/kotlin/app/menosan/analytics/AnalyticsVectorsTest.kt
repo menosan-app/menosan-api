@@ -45,8 +45,8 @@ class AnalyticsVectorsTest {
         return Expected(
             stats = stats,
             hotspots = findHotspots(stats, tax),
-            comparison = compare(stats, previous, case.previousWeekStart),
-            impacts = measureImpact(case.adoptions, stats),
+            comparison = compare(stats, previous, case.previousWeekStart, tax),
+            impacts = measureImpact(case.adoptions, stats, tax),
         )
     }
 
@@ -89,7 +89,7 @@ class AnalyticsVectorsTest {
 
         const val ABOUT =
             "Shared test vectors for the Menosan analytics (DEVELOPMENT_PLAN §5.1-§5.4), used by menosan-api and menosan-android. " +
-                "Subcategory codes refer to taxonomy.json (taxonomyVersion). For each case: " +
+                "Subcategory codes refer to taxonomy.json (taxonomyVersion); each quantity is in its subcategory's unit (grams for food, pieces otherwise). For each case: " +
                 "stats = aggregate(entries); hotspots = findHotspots(stats); " +
                 "comparison = compare(stats, aggregate(previousEntries), previousWeekStart), where an empty previousEntries means nothing was logged in W-1; " +
                 "impacts = measureImpact(adoptions, stats), where adoptions were made on report W-1. " +

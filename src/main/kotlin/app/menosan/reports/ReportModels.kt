@@ -2,6 +2,7 @@ package app.menosan.reports
 
 import app.menosan.analytics.Comparison
 import app.menosan.analytics.HotspotCriterion
+import app.menosan.analytics.QuantityUnit
 import app.menosan.analytics.SubcategoryInfo
 import app.menosan.analytics.Trend
 import app.menosan.analytics.WeeklyStats
@@ -14,7 +15,10 @@ import kotlinx.serialization.json.Json
 data class ReportSummary(
     val weekStart: String,
     val weekEnd: String,
-    val analyzedQuantity: Int,
+    /** Analyzed entries, and their pieces and grams (the units can't be added up). */
+    val analyzedEntries: Int,
+    val analyzedPieces: Int,
+    val analyzedGrams: Int,
     val hotspotCount: Int,
     val adoptedCount: Int,
     val isLatest: Boolean,
@@ -40,6 +44,7 @@ data class HotspotResponse(
     val criteria: List<HotspotCriterion>,
     val frequency: Int,
     val quantity: Int,
+    val unit: QuantityUnit,
     val score: Double,
     val recommendations: List<RecommendationResponse>,
 )
@@ -65,6 +70,8 @@ data class ImpactResponse(
     val interventionId: String,
     val title: String,
     val targetSubcategory: String,
+    /** Unit of baselineQuantity and followupQuantity. */
+    val unit: QuantityUnit,
     val baselineWeekStart: String,
     val baselineQuantity: Int,
     val followupQuantity: Int,
@@ -80,4 +87,4 @@ internal val ReportJson = Json {
 
 /** The taxonomy reduced to what the pure analytics functions need. */
 fun Taxonomy.analyticsTaxonomy(): Map<String, SubcategoryInfo> =
-    subcategories.associate { it.code to SubcategoryInfo(it.code, it.category, it.avoidable) }
+    subcategories.associate { it.code to SubcategoryInfo(it.code, it.category, it.avoidable, it.unit) }

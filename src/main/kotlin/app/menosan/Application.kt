@@ -89,7 +89,7 @@ fun main() {
     val interventions: InterventionEngine = LibraryInterventionEngine(ExposedInterventionRepository(db), gemini, taxonomy)
     val tokenVerifier = FirebaseTokenVerifier(config.firebaseProjectId, config.firebaseServiceAccountJsonB64)
     val entries = ExposedEntryRepository(db)
-    val reports = DefaultReportService(ReportStore(db), clock, taxonomy, interventions)
+    val reports = DefaultReportService(ReportStore(db, taxonomy), clock, taxonomy, interventions)
     if (config.devToolsEnabled) log.warn("Dev tools are enabled at /internal/dev (staging only)")
 
     val deps = AppDeps(
@@ -101,7 +101,7 @@ fun main() {
         users = ExposedUserRepository(db),
         entries = entries,
         accountDeletion = AccountDeletionService(db, FirebaseAdminUsers(tokenVerifier.auth)),
-        exporter = ExposedDataExporter(db, clock),
+        exporter = ExposedDataExporter(db, clock, taxonomy),
         photoAnalyzer = GeminiPhotoAnalyzer(photoGemini, taxonomy, clock),
         reports = reports,
         interventions = interventions,

@@ -1,5 +1,6 @@
 package app.menosan.photo
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.ALICE_TOKEN
 import app.menosan.BOB_TOKEN
 import app.menosan.common.ApiException
@@ -47,7 +48,7 @@ class PhotoRoutesTest {
     }
 
     private companion object {
-        val SUGGESTION = PhotoSuggestion("Coffee 3-in-1 sachet", "RESIDUAL", "RES_SACHETS", 5, 0.82)
+        val SUGGESTION = PhotoSuggestion("Coffee 3-in-1 sachet", "RESIDUAL", "RES_SACHETS", 5, QuantityUnit.PIECES, 0.82)
         val JPEG_HEADER = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
 
         fun jpeg(size: Int = 1024, marker: String = ""): ByteArray =

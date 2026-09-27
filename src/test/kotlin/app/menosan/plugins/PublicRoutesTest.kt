@@ -42,13 +42,16 @@ class PublicRoutesTest {
         val response = client.get("/v1/taxonomy")
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.json()
-        assertEquals(1, body["version"]!!.jsonPrimitive.content.toInt())
+        assertEquals(2, body["version"]!!.jsonPrimitive.content.toInt())
         assertEquals(4, body["categories"]!!.jsonArray.size)
         val subcategories = body["subcategories"]!!.jsonArray
         assertEquals(25, subcategories.size)
         val sachets = subcategories.first { it.jsonObject["code"]!!.jsonPrimitive.content == "RES_SACHETS" }.jsonObject
         assertEquals("RESIDUAL", sachets["category"]!!.jsonPrimitive.content)
         assertEquals("true", sachets["avoidable"]!!.jsonPrimitive.content)
+        assertEquals("PIECES", sachets["unit"]!!.jsonPrimitive.content)
+        val leftovers = subcategories.first { it.jsonObject["code"]!!.jsonPrimitive.content == "BIO_FOOD_LEFTOVERS" }.jsonObject
+        assertEquals("GRAMS", leftovers["unit"]!!.jsonPrimitive.content)
     }
 
     @Test

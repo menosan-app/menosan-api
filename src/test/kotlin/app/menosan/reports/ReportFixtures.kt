@@ -56,7 +56,7 @@ class ReportFixtures(
     val db = PostgresTestDb.db
     val taxonomy: Taxonomy = Taxonomy.loadDefault()
     val clock = OverridableClock().apply { setOverride(now) }
-    val store = ReportStore(db)
+    val store = ReportStore(db, taxonomy)
     val service = DefaultReportService(store, clock, taxonomy, engine)
     private val users = ExposedUserRepository(db)
 

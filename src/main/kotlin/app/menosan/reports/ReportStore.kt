@@ -6,6 +6,7 @@ import app.menosan.analytics.EntryInput
 import app.menosan.analytics.Hotspot
 import app.menosan.analytics.HotspotCriterion
 import app.menosan.analytics.Impact
+import app.menosan.analytics.QuantityUnit
 import app.menosan.analytics.Trend
 import app.menosan.analytics.WeeklyStats
 import app.menosan.common.WeekCalc
@@ -18,6 +19,7 @@ import app.menosan.db.ReportRecommendations
 import app.menosan.db.WasteEntries
 import app.menosan.db.WeeklyReports
 import app.menosan.interventions.RecommendationPick
+import app.menosan.taxonomy.Taxonomy
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -61,7 +63,9 @@ data class ComputedReport(
 )
 
 /** SQL for reports. Every query is scoped by user id, directly or through a report id owned by that user. */
-class ReportStore(private val db: Db) {
+class ReportStore(private val db: Db, private val taxonomy: Taxonomy) {
+
+    private fun unitOf(subcategory: String): QuantityUnit = taxonomy.unitOf(subcategory) ?: QuantityUnit.PIECES
 
     suspend fun entries(userId: UUID, weekStart: LocalDate): List<EntryInput> = db.tx {
         WasteEntries.select(WasteEntries.subcategoryCode, WasteEntries.quantity)
@@ -215,10 +219,13 @@ class ReportStore(private val db: Db) {
         rows.map { row ->
             val id = row[WeeklyReports.id]
             val weekStart = row[WeeklyReports.weekStart]
+            val stats = row.stats()
             ReportSummary(
                 weekStart = weekStart.toString(),
                 weekEnd = row[WeeklyReports.weekEnd].toString(),
-                analyzedQuantity = row.stats().analyzedTotals.quantity,
+                analyzedEntries = stats.analyzedTotals.frequency,
+                analyzedPieces = stats.analyzedTotals.pieces,
+                analyzedGrams = stats.analyzedTotals.grams,
                 hotspotCount = hotspots[id] ?: 0,
                 adoptedCount = adopted[id] ?: 0,
                 isLatest = weekStart == latestWeekStart,
@@ -259,6 +266,7 @@ class ReportStore(private val db: Db) {
                     interventionId = it[AdoptedInterventions.interventionId].toString(),
                     title = it[Interventions.title],
                     targetSubcategory = it[AdoptedInterventions.targetSubcategory],
+                    unit = unitOf(it[AdoptedInterventions.targetSubcategory]),
                     baselineWeekStart = it[AdoptedInterventions.baselineWeekStart].toString(),
                     baselineQuantity = it[InterventionImpacts.baselineQuantity],
                     followupQuantity = it[InterventionImpacts.followupQuantity],
@@ -279,6 +287,7 @@ class ReportStore(private val db: Db) {
                     criteria = h[Hotspots.criteria].map(HotspotCriterion::valueOf),
                     frequency = h[Hotspots.frequency],
                     quantity = h[Hotspots.quantity],
+                    unit = unitOf(h[Hotspots.subcategoryCode]),
                     score = h[Hotspots.score].toDouble(),
                     recommendations = recommendations[h[Hotspots.id]].orEmpty(),
                 )

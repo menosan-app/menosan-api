@@ -27,7 +27,7 @@ class GenAiGeminiClientTest {
         assertEquals(setOf("isWaste", "name", "category", "subcategory", "quantity", "confidence"), properties.keys)
         assertEquals(taxonomy.subcategories.map { it.code }, properties["subcategory"]!!.enum_().get())
         assertEquals(1.0, properties["quantity"]!!.minimum().get())
-        assertEquals(999.0, properties["quantity"]!!.maximum().get())
+        assertEquals(10000.0, properties["quantity"]!!.maximum().get())
         assertEquals(60L, properties["name"]!!.maxLength().get())
         assertEquals(6, schema.required().get().size)
         assertEquals("isWaste", schema.propertyOrdering().get().first())

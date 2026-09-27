@@ -102,12 +102,12 @@ class EndToEndScenario(
             dev("/reset", """{"email":"$email"}""")
             setClock(weekAStart)
 
-            // ---- Week A: 10 sachets, 2 PET bottles, 1 leftover ----
+            // ---- Week A: 10 sachets, 2 PET bottles, 150 g of leftovers ----
             val weekA = currentWeek()
             val sachetId = logEntry("Coffee 3-in-1 sachet", "RES_SACHETS", 5, minutesAgo = 4)
             logEntry("Shampoo sachet", "RES_SACHETS", 5, minutesAgo = 3)
             logEntry("Softdrink bottle", "REC_PET_BOTTLES", 2, minutesAgo = 2)
-            logEntry("Leftover rice", "BIO_FOOD_LEFTOVERS", 1, minutesAgo = 1)
+            logEntry("Leftover rice", "BIO_FOOD_LEFTOVERS", 150, minutesAgo = 1)
             val listed = expect(200, call("GET", "/v1/entries", token = token), "list entries").obj()
             assertThat(listed["entries"]!!.jsonArray.size == 4, "week A lists 4 entries", listed.toString())
             log("Week $weekA: logged 4 entries")
@@ -146,10 +146,15 @@ class EndToEndScenario(
             // ---- Roll to week C: report B shows the comparison and the impact ----
             setClock(weekAStart.plus(Duration.ofDays(14)))
             val reportB = expect(200, call("GET", "/v1/reports/$weekB", token = token), "report B").obj()
-            val total = reportB["comparison"]!!.jsonObject["total"]!!.jsonObject
+            val total = reportB["comparison"]!!.jsonObject["pieces"]!!.jsonObject
             assertThat(
-                total["previous"]!!.jsonPrimitive.int == 13 && total["current"]!!.jsonPrimitive.int == 6 && total.string("trend") == "DECREASED",
-                "comparison 13 → 6 DECREASED", total.toString(),
+                total["previous"]!!.jsonPrimitive.int == 12 && total["current"]!!.jsonPrimitive.int == 6 && total.string("trend") == "DECREASED",
+                "comparison 12 → 6 pieces DECREASED", total.toString(),
+            )
+            val grams = reportB["comparison"]!!.jsonObject["grams"]!!.jsonObject
+            assertThat(
+                grams["previous"]!!.jsonPrimitive.int == 150 && grams["current"]!!.jsonPrimitive.int == 0,
+                "comparison 150 g → 0 g", grams.toString(),
             )
             val impact = reportB["impacts"]!!.jsonArray.single().jsonObject
             assertThat(

@@ -78,7 +78,7 @@ class ReportRoutesTest {
             val rows = Json.parseToJsonElement(list.bodyAsText()).jsonArray
             assertEquals(listOf("2026-09-20", "2026-09-13"), rows.map { it.jsonObject["weekStart"]!!.jsonPrimitive.content })
             assertEquals(
-                setOf("weekStart", "weekEnd", "analyzedQuantity", "hotspotCount", "adoptedCount", "isLatest"),
+                setOf("weekStart", "weekEnd", "analyzedEntries", "analyzedPieces", "analyzedGrams", "hotspotCount", "adoptedCount", "isLatest"),
                 rows[0].jsonObject.keys,
             )
 
@@ -95,7 +95,7 @@ class ReportRoutesTest {
             )
             val hotspot = body["hotspots"]!!.jsonArray.single().jsonObject
             assertEquals(
-                setOf("rank", "subcategory", "criteria", "frequency", "quantity", "score", "recommendations"),
+                setOf("rank", "subcategory", "criteria", "frequency", "quantity", "unit", "score", "recommendations"),
                 hotspot.keys,
             )
             assertEquals(
@@ -106,10 +106,10 @@ class ReportRoutesTest {
                 hotspot["recommendations"]!!.jsonArray.single().jsonObject.keys,
             )
             val comparison = body["comparison"]!!.jsonObject
-            assertEquals(setOf("previousWeekStart", "total", "categories", "subcategories"), comparison.keys)
+            assertEquals(setOf("previousWeekStart", "pieces", "grams", "categories", "subcategories"), comparison.keys)
             assertEquals(
                 setOf("previous", "current", "delta", "deltaPct", "trend"),
-                comparison["total"]!!.jsonObject.keys,
+                comparison["grams"]!!.jsonObject.keys,
             )
         }
     }

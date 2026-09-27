@@ -55,7 +55,7 @@ class ExportRoutesTest {
 
                 val doc = response.json()
                 assertEquals("menosan-export", doc.str("format"))
-                assertEquals(1, doc["exportVersion"]!!.jsonPrimitive.int)
+                assertEquals(2, doc["exportVersion"]!!.jsonPrimitive.int)
                 assertEquals("2026-09-30T04:00:00Z", doc.str("exportedAt"))
                 assertEquals("Asia/Manila", doc.str("timezone"))
 
@@ -68,6 +68,7 @@ class ExportRoutesTest {
                 assertEquals(listOf(older, newer).map { it.toString() }, entries.map { it.str("id") }) // oldest first
                 assertEquals(listOf("Sando bag", "Shampoo sachet"), entries.map { it.str("name") })
                 assertEquals(PREVIOUS_WEEK.toString(), entries[0].str("weekStart"))
+                assertEquals("PIECES", entries[0].str("unit"))
 
                 val report = doc.list("reports").single()
                 assertEquals(PREVIOUS_WEEK.toString(), report.str("weekStart"))

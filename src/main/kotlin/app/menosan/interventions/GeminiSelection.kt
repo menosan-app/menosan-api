@@ -1,5 +1,6 @@
 package app.menosan.interventions
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.GeminiRequest
 import app.menosan.taxonomy.Taxonomy
 import kotlinx.serialization.Serializable
@@ -66,8 +67,8 @@ internal object GeminiSelection {
         val hotspot = input.hotspot
         val subcategory = taxonomy.subcategory(hotspot.subcategoryCode)
         val titles = allCandidates.associate { it.id to it.title }
-        val sharePct = if (input.analyzedTotalQuantity > 0) {
-            Math.round(hotspot.quantity * 1000.0 / input.analyzedTotalQuantity) / 10.0
+        val sharePct = if (input.analyzedEntries > 0) {
+            Math.round(hotspot.frequency * 1000.0 / input.analyzedEntries) / 10.0
         } else {
             null
         }
@@ -79,8 +80,9 @@ internal object GeminiSelection {
                 putJsonArray("examples") { subcategory?.examples?.forEach { add(it) } }
                 putJsonArray("criteria") { hotspot.criteria.forEach { add(it) } }
                 put("entriesThisWeek", hotspot.frequency)
-                put("piecesThisWeek", hotspot.quantity)
-                put("shareOfAnalyzedPiecesPct", sharePct)
+                put("quantityThisWeek", hotspot.quantity)
+                put("unit", if (hotspot.unit == QuantityUnit.GRAMS) "grams" else "pieces")
+                put("shareOfAnalyzedEntriesPct", sharePct)
             }
             putJsonArray("lastWeekAdoptionsForThisHotspot") {
                 input.previousAdoptions.filter { it.interventionId in titles }.forEach {

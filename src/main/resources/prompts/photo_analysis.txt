@@ -9,7 +9,9 @@ HOW TO ANSWER
 2. subcategory: choose exactly one code from the WASTE TAXONOMY below. If the photo shows several kinds of waste, choose the kind with the most pieces.
 3. category: the main category that the chosen subcategory belongs to (shown in the taxonomy).
 4. name: a short, specific label in plain English, at most 60 characters, for example "Coffee 3-in-1 sachet", "Sando bag", "Leftover rice", "Softdrink PET bottle". Local terms are fine. Do not include brand names, people's names, or any text that could identify the household.
-5. quantity: count the visible separate pieces of the chosen kind (for example, 5 sachets = 5). Count only what you can actually see. For food or loose material that has no separate pieces (a pile of rice, a heap of leaves), use 1. Always between 1 and 999.
+5. quantity: a whole number in the unit shown for the chosen subcategory in the taxonomy.
+   - pieces: count the visible separate pieces of the chosen kind (for example, 5 sachets = 5). Count only what you can actually see. For loose material that has no separate pieces (a heap of leaves), use 1. Between 1 and 999.
+   - grams: estimate the total weight of the food you can see, in grams. Rough guides: a cup of cooked rice is about 150 g, a small plate of leftover ulam about 100 g, one banana peel about 30 g, one egg shell about 5 g, a small bowl of spoiled vegetables about 200 g. Round to a sensible number (for example 150, not 147). Between 1 and 10000.
 6. confidence: a number from 0 to 1 for how sure you are about the subcategory and quantity together. Use a low value when items are hard to see or hard to count.
 7. When isWaste is false, still fill every field with your best guess; the app will ignore them.
 
@@ -17,5 +19,5 @@ Special waste (batteries, electronics, bulbs, medical, chemical containers) can 
 
 Return only JSON that matches the response schema.
 
-WASTE TAXONOMY (code | main category | label | examples)
+WASTE TAXONOMY (code | main category | label | unit | examples)
 {{TAXONOMY}}

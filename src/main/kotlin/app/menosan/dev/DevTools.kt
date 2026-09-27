@@ -1,5 +1,6 @@
 package app.menosan.dev
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.ApiException
 import app.menosan.common.ErrorCode
 import app.menosan.common.OverridableClock
@@ -42,7 +43,8 @@ data class SeededWeek(
     val weekStart: String,
     val entries: Int,
     /** Null when no report was generated (it always is for seeded weeks). */
-    val analyzedQuantity: Int?,
+    val analyzedPieces: Int?,
+    val analyzedGrams: Int?,
     val hotspots: List<String>,
     /** Codes of the interventions the seed adopted on this week's report. */
     val adopted: List<String>,
@@ -182,7 +184,8 @@ class DevTools(
     private fun ReportResponse?.toSeededWeek(week: LocalDate, entryCount: Int, adopted: List<String>) = SeededWeek(
         weekStart = week.toString(),
         entries = entryCount,
-        analyzedQuantity = this?.stats?.analyzedTotals?.quantity,
+        analyzedPieces = this?.stats?.analyzedTotals?.pieces,
+        analyzedGrams = this?.stats?.analyzedTotals?.grams,
         hotspots = this?.hotspots?.map { it.subcategory }.orEmpty(),
         adopted = adopted,
         impacts = this?.impacts?.size ?: 0,
@@ -210,13 +213,19 @@ class DevTools(
 
         return HOUSEHOLD.flatMap { item ->
             val baseline = reduced[item.subcategory]
-            if (baseline != null) {
+            val grams = taxonomy.unitOf(item.subcategory) == QuantityUnit.GRAMS
+            if (baseline != null && grams) {
+                // Two entries adding up to under half the baseline grams: the follow-up always shows DECREASED.
+                val each = baseline / 5
+                if (each == 0) emptyList() else List(2) { SyntheticEntry(item.names.random(random), item.subcategory, each, at()) }
+            } else if (baseline != null) {
                 // One piece per entry, baseline / 2 entries: the follow-up always shows DECREASED.
                 List(baseline / 2) { SyntheticEntry(item.names.random(random), item.subcategory, 1, at()) }
             } else {
                 List(random.nextInt(item.entriesPerWeek.first, item.entriesPerWeek.last + 1)) {
-                    val pieces = random.nextInt(item.piecesPerEntry.first, item.piecesPerEntry.last + 1)
-                    SyntheticEntry(item.names.random(random), item.subcategory, pieces, at())
+                    var quantity = random.nextInt(item.quantityPerEntry.first, item.quantityPerEntry.last + 1)
+                    if (grams) quantity = (quantity + 5) / 10 * 10 // people estimate grams in round numbers
+                    SyntheticEntry(item.names.random(random), item.subcategory, quantity, at())
                 }
             }
         }
@@ -226,15 +235,16 @@ class DevTools(
         val subcategory: String,
         val names: List<String>,
         val entriesPerWeek: IntRange,
-        val piecesPerEntry: IntRange,
+        /** In the unit of the subcategory (grams for food). */
+        val quantityPerEntry: IntRange,
     )
 
     private companion object {
         val HOUSEHOLD = listOf(
             SeedItem("RES_SACHETS", listOf("Coffee 3-in-1 sachet", "Shampoo sachet", "Condiment packet"), 4..7, 1..3),
             SeedItem("RES_PLASTIC_BAGS", listOf("Sando bag", "Labo bag", "Ice bag"), 3..5, 1..3),
-            SeedItem("BIO_FOOD_LEFTOVERS", listOf("Leftover rice", "Leftover ulam"), 2..4, 1..2),
-            SeedItem("BIO_PEELS_SCRAPS", listOf("Banana peels", "Vegetable scraps", "Eggshells"), 2..4, 1..4),
+            SeedItem("BIO_FOOD_LEFTOVERS", listOf("Leftover rice", "Leftover ulam"), 2..4, 80..350),
+            SeedItem("BIO_PEELS_SCRAPS", listOf("Banana peels", "Vegetable scraps", "Eggshells"), 2..4, 30..250),
             SeedItem("REC_PET_BOTTLES", listOf("Softdrink bottle", "Water bottle"), 1..3, 1..2),
             SeedItem("RES_SNACK_WRAPPERS", listOf("Chichirya pack", "Biscuit wrapper"), 1..3, 1..3),
             SeedItem("RES_STYROFOAM", listOf("Takeout styro box"), 0..2, 1..2),

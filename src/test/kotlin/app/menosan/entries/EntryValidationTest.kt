@@ -66,13 +66,24 @@ class EntryValidationTest {
     }
 
     @Test
-    fun `quantity must be 1 to 999`() {
+    fun `quantity in pieces must be 1 to 999`() {
         assertInvalid("quantity", valid.copy(quantity = null))
         assertInvalid("quantity", valid.copy(quantity = 0))
         assertInvalid("quantity", valid.copy(quantity = -1))
         assertInvalid("quantity", valid.copy(quantity = 1000))
         assertEquals(1, validateEntry(valid.copy(quantity = 1), taxonomy).quantity)
         assertEquals(999, validateEntry(valid.copy(quantity = 999), taxonomy).quantity)
+    }
+
+    @Test
+    fun `quantity in grams must be 1 to 10000 for food subcategories`() {
+        val food = valid.copy(subcategory = "BIO_FOOD_LEFTOVERS")
+        assertInvalid("quantity", food.copy(quantity = 0))
+        assertInvalid("quantity", food.copy(quantity = 10_001))
+        assertEquals(10_000, validateEntry(food.copy(quantity = 10_000), taxonomy).quantity)
+        assertEquals(1000, validateEntry(food.copy(quantity = 1000), taxonomy).quantity)
+        // Yard waste is still counted in pieces.
+        assertInvalid("quantity", valid.copy(subcategory = "BIO_YARD_WASTE", quantity = 1000))
     }
 
     @Test

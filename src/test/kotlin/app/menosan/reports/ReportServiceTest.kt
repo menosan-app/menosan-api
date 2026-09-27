@@ -37,7 +37,7 @@ class ReportServiceTest {
         f.log(user, W1, "RES_SACHETS", 10)
         f.log(user, W2, "RES_SACHETS", 3)
         f.log(user, W2, "RES_SACHETS", 2)
-        f.log(user, W2, "BIO_PEELS_SCRAPS", 1)
+        f.log(user, W2, "BIO_OTHER", 1)
         f.log(user, W2, "SPC_BATTERIES", 4)
 
         val report = assertNotNull(f.service.getReport(user, W2))
@@ -45,8 +45,8 @@ class ReportServiceTest {
         assertEquals("2026-09-26", report.weekEnd)
         assertEquals(1, report.revision)
         assertTrue(report.isLatest)
-        assertEquals(6, report.stats.analyzedTotals.quantity)
-        assertEquals(4, report.stats.special.quantity)
+        assertEquals(6, report.stats.analyzedTotals.pieces)
+        assertEquals(4, report.stats.special.pieces)
 
         val hotspot = report.hotspots.single()
         assertEquals("RES_SACHETS", hotspot.subcategory)
@@ -57,9 +57,9 @@ class ReportServiceTest {
 
         val comparison = assertNotNull(report.comparison)
         assertEquals("2026-09-13", comparison.previousWeekStart)
-        assertEquals(10, comparison.total.previous)
-        assertEquals(5 + 1, comparison.total.current)
-        assertEquals(Trend.DECREASED, comparison.total.trend)
+        assertEquals(10, comparison.pieces.previous)
+        assertEquals(5 + 1, comparison.pieces.current)
+        assertEquals(Trend.DECREASED, comparison.pieces.trend)
         assertTrue(report.impacts.isEmpty())
         assertEquals(listOf("RES_SACHETS"), f.engine.calledFor())
     }
@@ -83,7 +83,7 @@ class ReportServiceTest {
         f.log(user, W2, "SPC_BATTERIES", 2)
         val report = assertNotNull(f.service.getReport(user, W2))
         assertTrue(report.hotspots.isEmpty())
-        assertEquals(2, report.stats.special.quantity)
+        assertEquals(2, report.stats.special.pieces)
         assertNull(report.comparison)
         assertTrue(f.engine.calls.isEmpty())
     }
@@ -170,7 +170,7 @@ class ReportServiceTest {
         val user = f.newUser()
         val sachetPicks = f.recommendable("RES_SACHETS")
         val bagPicks = f.recommendable("RES_PLASTIC_BAGS")
-        val peelPicks = f.recommendable("BIO_PEELS_SCRAPS", count = 1)
+        val peelPicks = f.recommendable("BIO_OTHER", count = 1)
 
         // W2: SACHETS f1 q5 and BAGS f1 q1 are both "most frequent".
         f.log(user, W2, "RES_SACHETS", 5)
@@ -182,24 +182,24 @@ class ReportServiceTest {
 
         f.log(user, W3, "RES_SACHETS", 2)
         f.service.ensureReport(user, W3)
-        assertEquals(6, f.service.getReport(user, W3)!!.comparison!!.total.previous)
+        assertEquals(6, f.service.getReport(user, W3)!!.comparison!!.pieces.previous)
         val sachetRecIds = recommendationRowIds(f, sachetPicks) // W2's and W3's SACHETS hotspots
         f.engine.calls.clear()
 
         // Late offline entries land in W2: PEELS becomes the top hotspot, BAGS drops out.
-        f.log(user, W2, "BIO_PEELS_SCRAPS", 20)
-        f.log(user, W2, "BIO_PEELS_SCRAPS", 1)
+        f.log(user, W2, "BIO_OTHER", 20)
+        f.log(user, W2, "BIO_OTHER", 1)
         f.service.onLateEntry(user, W2)
 
         val w2 = f.service.getReport(user, W2)!!
         assertEquals(2, w2.revision)
-        assertEquals(listOf("BIO_PEELS_SCRAPS", "RES_SACHETS"), w2.hotspots.map { it.subcategory })
+        assertEquals(listOf("BIO_OTHER", "RES_SACHETS"), w2.hotspots.map { it.subcategory })
         assertEquals(listOf(MOST_FREQUENT, HIGHEST_QUANTITY), w2.hotspots[0].criteria)
         assertEquals(listOf(AVOIDABLE), w2.hotspots[1].criteria)
         assertEquals(peelPicks.map { it.toString() }, w2.hotspots[0].recommendations.map { it.interventionId })
         assertEquals(sachetRecIds, recommendationRowIds(f, sachetPicks), "existing recommendations are kept, not recreated")
         assertEquals(listOf(true, false), w2.hotspots[1].recommendations.map { it.adopted })
-        assertEquals(listOf("BIO_PEELS_SCRAPS"), f.engine.calledFor(), "only new hotspots get new recommendations")
+        assertEquals(listOf("BIO_OTHER"), f.engine.calledFor(), "only new hotspots get new recommendations")
 
         val adoptions = f.db.tx { AdoptedInterventions.selectAll().where { AdoptedInterventions.reportId eq w2Id }.count() }
         assertEquals(2, adoptions, "adoptions are never removed by regeneration")
@@ -207,7 +207,7 @@ class ReportServiceTest {
 
         val w3 = f.service.getReport(user, W3)!!
         assertEquals(2, w3.revision)
-        assertEquals(27, w3.comparison!!.total.previous)
+        assertEquals(27, w3.comparison!!.pieces.previous)
         assertEquals(
             listOf("RES_PLASTIC_BAGS" to Trend.DECREASED, "RES_SACHETS" to Trend.DECREASED),
             w3.impacts.map { it.targetSubcategory to it.result },
@@ -225,7 +225,7 @@ class ReportServiceTest {
         f.log(user, W2, "RES_SACHETS", 4)
         f.service.onLateEntry(user, W2)
         assertEquals(1, f.service.getReport(user, W2)!!.revision)
-        assertEquals(4, f.service.getReport(user, W3)!!.comparison!!.total.previous)
+        assertEquals(4, f.service.getReport(user, W3)!!.comparison!!.pieces.previous)
     }
 
     @Test
@@ -240,7 +240,7 @@ class ReportServiceTest {
 
         val list = f.service.listReports(user)
         assertEquals(listOf("2026-09-27", "2026-09-13"), list.map { it.weekStart })
-        assertEquals(ReportSummary("2026-09-27", "2026-10-03", 3, 1, 0, true), list[0])
+        assertEquals(ReportSummary("2026-09-27", "2026-10-03", 1, 3, 0, 1, 0, true), list[0])
         assertFalse(list[1].isLatest)
 
         val w3Id = f.store.findReportId(user, W3)!!

@@ -1,5 +1,6 @@
 package app.menosan.export
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.ApiException
 import app.menosan.common.ErrorCode
 import app.menosan.common.WeekCalc
@@ -14,6 +15,7 @@ import app.menosan.db.Users
 import app.menosan.db.WasteEntries
 import app.menosan.db.WeeklyReports
 import app.menosan.plugins.toApiString
+import app.menosan.taxonomy.Taxonomy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import org.jetbrains.exposed.v1.core.JoinType
@@ -46,6 +48,8 @@ data class ExportEntry(
     val category: String,
     val subcategory: String,
     val quantity: Int,
+    /** PIECES, or GRAMS for food subcategories. */
+    val unit: String,
     val source: String,
     val createdAt: String,
     val weekStart: String,
@@ -106,7 +110,7 @@ data class ExportAdoption(
 data class ExportImpact(val followupWeekStart: String, val baselineQuantity: Int, val followupQuantity: Int, val result: String)
 
 const val EXPORT_FORMAT = "menosan-export"
-const val EXPORT_VERSION = 1
+const val EXPORT_VERSION = 2
 
 fun interface DataExporter {
     suspend fun export(userId: UUID): ExportDocument
@@ -117,7 +121,7 @@ object StubDataExporter : DataExporter {
 }
 
 /** Reads the whole account in one transaction, so the export is a consistent snapshot. All queries are scoped by `userId`. */
-class ExposedDataExporter(private val db: Db, private val clock: Clock) : DataExporter {
+class ExposedDataExporter(private val db: Db, private val clock: Clock, private val taxonomy: Taxonomy) : DataExporter {
     override suspend fun export(userId: UUID): ExportDocument = db.tx {
         val user = Users.selectAll().where { Users.id eq userId }.singleOrNull()
             ?: throw ApiException(ErrorCode.ACCOUNT_NOT_FOUND, "No Menosan account exists for this sign-in yet.")
@@ -131,6 +135,7 @@ class ExposedDataExporter(private val db: Db, private val clock: Clock) : DataEx
                     category = it[WasteEntries.category],
                     subcategory = it[WasteEntries.subcategoryCode],
                     quantity = it[WasteEntries.quantity],
+                    unit = (taxonomy.unitOf(it[WasteEntries.subcategoryCode]) ?: QuantityUnit.PIECES).name,
                     source = it[WasteEntries.entrySource],
                     createdAt = it[WasteEntries.createdAt].toInstant().toApiString(),
                     weekStart = it[WasteEntries.weekStart].toString(),

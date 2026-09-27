@@ -1,7 +1,8 @@
-# Menosan API contract — v1
+# Menosan API contract — v1 (units revision 2026-09-27)
 
 > **Status:** v1, **frozen 2026-09-23** at the end of BE-0. Canonical copy of `docs/DEVELOPMENT_PLAN.md` §8, plus the clarifications in §5 below.
 > Android (`menosan-android`) builds against this file. Changes follow §4 and must be logged in `docs/CHANGELOG-contract.md`.
+> **2026-09-27:** quantities have a unit per subcategory (food in grams, the rest in pieces). This was a breaking change approved by the team; see §8 and `CHANGELOG-contract.md`.
 
 ---
 
@@ -25,11 +26,11 @@
 | `GET /v1/export` | Full JSON export (profile, entries, reports, hotspots, comparisons, recommendations, adoptions, impacts). | NFR16 |
 | `GET /v1/weeks/current` | `{weekStart, weekEnd, timezone:"Asia/Manila", serverNow}`. | SFR10.3 |
 | `GET /v1/entries?weekStart=` | Entries for a week (default: current), newest first. | SFR10.1–10.2 |
-| `PUT /v1/entries/{id}` | Create or update (idempotent upsert). Body `{name, subcategory, quantity, source, createdAt}`. The server derives `category` and `weekStart`. Create returns `201`, update `200`. Updates may not change `createdAt`. | SFR5, SFR6, SFR11 |
+| `PUT /v1/entries/{id}` | Create or update (idempotent upsert). Body `{name, subcategory, quantity, source, createdAt}`. `quantity` is in the subcategory's unit (§8). The server derives `category` and `weekStart`. Create returns `201`, update `200`. Updates may not change `createdAt`. | SFR5, SFR6, SFR11 |
 | `DELETE /v1/entries/{id}` | Returns `204`, also when the entry is already gone (idempotent). `409 WEEK_CLOSED` if the entry's week is closed. | SFR11.2–11.3 |
 | `POST /v1/entries/sync` | Batch for the offline outbox: `{upserts:[EntryPut & {id}], deletes:[id]}` → `{results:[{id, status:"OK"\|"WEEK_CLOSED"\|"INVALID"\|..., entry?}]}`. Items are processed independently, and the batch never fails as a whole because of one item. | SFR6.3–6.4, NFR8 |
-| `POST /v1/photo-analysis` | `multipart/form-data`, field `image` (JPEG, ≤ 2 MB). Returns `200 {suggestion:{name, category, subcategory, quantity, confidence}, warning}`. Also `422 ANALYSIS_FAILED`, `422 NOT_WASTE`, `413 IMAGE_TOO_LARGE`, `429 RATE_LIMITED` (30 per user per day). Nothing is stored. | SFR7–8, SFR9.5 |
-| `GET /v1/reports` | List `[ {weekStart, weekEnd, analyzedQuantity, hotspotCount, adoptedCount, isLatest} ]`, newest first. Runs lazy catch-up first. | SFR12.1, SFR18.2 |
+| `POST /v1/photo-analysis` | `multipart/form-data`, field `image` (JPEG, ≤ 2 MB). Returns `200 {suggestion:{name, category, subcategory, quantity, unit, confidence}, warning}`. Also `422 ANALYSIS_FAILED`, `422 NOT_WASTE`, `413 IMAGE_TOO_LARGE`, `429 RATE_LIMITED` (30 per user per day). Nothing is stored. | SFR7–8, SFR9.5 |
+| `GET /v1/reports` | List `[ {weekStart, weekEnd, analyzedEntries, analyzedPieces, analyzedGrams, hotspotCount, adoptedCount, isLatest} ]`, newest first. Runs lazy catch-up first. | SFR12.1, SFR18.2 |
 | `GET /v1/reports/{weekStart}` | Full report (§3). | SFR12–17 |
 | `POST /v1/reports/{weekStart}/adoptions` | `{interventionIds:[uuid]}` → the updated report. `409 ADOPTION_WINDOW_CLOSED` if the report is not the latest. | SFR16 |
 | `DELETE /v1/reports/{weekStart}/adoptions/{interventionId}` | Un-adopt within the window. | SFR16 |
@@ -42,14 +43,14 @@
 {
   "weekStart": "2026-09-27", "weekEnd": "2026-10-03", "revision": 1, "isLatest": true,
   "stats": {
-    "analyzedTotals": {"frequency": 42, "quantity": 118},
-    "categories": [{"category": "RESIDUAL", "frequency": 20, "quantity": 70, "sharePct": 59.3}],
-    "subcategories": [{"code": "RES_SACHETS", "category": "RESIDUAL", "frequency": 12, "quantity": 40}],
-    "special": {"frequency": 1, "quantity": 2}
+    "analyzedTotals": {"frequency": 42, "pieces": 118, "grams": 1450},
+    "categories": [{"category": "RESIDUAL", "frequency": 20, "pieces": 70, "grams": 0, "sharePct": 47.6}],
+    "subcategories": [{"code": "RES_SACHETS", "category": "RESIDUAL", "unit": "PIECES", "frequency": 12, "quantity": 40}],
+    "special": {"frequency": 1, "pieces": 2, "grams": 0}
   },
   "hotspots": [{
     "rank": 1, "subcategory": "RES_SACHETS", "criteria": ["MOST_FREQUENT","HIGHEST_QUANTITY","AVOIDABLE"],
-    "frequency": 12, "quantity": 40, "score": 1.0,
+    "frequency": 12, "quantity": 40, "unit": "PIECES", "score": 1.0,
     "recommendations": [{
       "interventionId": "…", "code": "RES_SACHETS_REFILL_STATION", "type": "REDUCE",
       "title": "…", "description": "…", "howTo": ["…"], "costLevel": "SAVES_MONEY", "effort": "LOW",
@@ -58,11 +59,12 @@
   }],
   "comparison": {
     "previousWeekStart": "2026-09-20",
-    "total": {"previous": 130, "current": 118, "delta": -12, "deltaPct": -9.2, "trend": "DECREASED"},
+    "pieces": {"previous": 130, "current": 118, "delta": -12, "deltaPct": -9.2, "trend": "DECREASED"},
+    "grams": {"previous": 1800, "current": 1450, "delta": -350, "deltaPct": -19.4, "trend": "DECREASED"},
     "categories": [ … ], "subcategories": [ … ]
   },
   "impacts": [{
-    "interventionId": "…", "title": "…", "targetSubcategory": "RES_PLASTIC_BAGS",
+    "interventionId": "…", "title": "…", "targetSubcategory": "RES_PLASTIC_BAGS", "unit": "PIECES",
     "baselineWeekStart": "2026-09-20", "baselineQuantity": 15, "followupQuantity": 9, "result": "DECREASED"
   }]
 }
@@ -106,7 +108,7 @@ Clients should switch on `error.code`, not only on the status.
 
 ### 5.3 `GET /v1/taxonomy`
 Returns the bundled `taxonomy.json` exactly, including the top-level `"timezone": "Asia/Manila"`:
-`{version, timezone, categories:[{code,label,analyzed}], subcategories:[{code,category,label,examples,avoidable,sortOrder}]}`.
+`{version, timezone, categories:[{code,label,analyzed}], subcategories:[{code,category,label,examples,avoidable,sortOrder,unit}]}`. Since version 2, `unit` is `PIECES` or `GRAMS` (§8).
 
 ### 5.4 `POST /v1/account`
 - `consent` must be `true`. A missing body, `false`, or a missing field returns `400 VALIDATION_FAILED` and creates nothing.
@@ -133,16 +135,16 @@ Added 2026-09-23 by BE-3. These fill gaps in §3 and don't change its shape.
   - `404 NOT_FOUND` when the week is still open, when the user logged nothing that week, or when the report would belong to someone else.
   - A missing report for a closed week that has entries is generated before responding.
 - `stats` (plan §5.1):
-  - `categories` always lists the three analyzed categories in the order `BIODEGRADABLE`, `RECYCLABLE`, `RESIDUAL`, including those with zero entries. `sharePct` is `0.0` when nothing analyzed was logged.
-  - `subcategories` lists only analyzed subcategories with at least one entry, ordered by quantity (desc), then frequency (desc), then code.
+  - `categories` always lists the three analyzed categories in the order `BIODEGRADABLE`, `RECYCLABLE`, `RESIDUAL`, including those with zero entries. `sharePct` is the category's share of analyzed **entries** (pieces and grams can't be added), and `0.0` when nothing analyzed was logged. Each category has `pieces` and `grams` totals.
+  - `subcategories` lists only analyzed subcategories with at least one entry, ordered by frequency (desc), then code. Each row has the `unit` of its `quantity`.
   - SPECIAL waste appears only in `special`.
-- `hotspots` (plan §5.2): at most 3, ordered by `rank`. `criteria` holds `MOST_FREQUENT`, `HIGHEST_QUANTITY`, and `AVOIDABLE`, in that order. `score` has at most 4 decimals. The list is empty for a week with only SPECIAL waste. `recommendations` (1–3, ordered by rank) may be empty if no curated item could be picked.
+- `hotspots` (plan §5.2): at most 3, ordered by `rank`. `criteria` holds `MOST_FREQUENT`, `HIGHEST_QUANTITY`, and `AVOIDABLE`, in that order. `score` has at most 4 decimals. `quantity` is in the hotspot's `unit`; `HIGHEST_QUANTITY` and the score use the largest quantity **of the same unit** (§8). The list is empty for a week with only SPECIAL waste. `recommendations` (1–3, ordered by rank) may be empty if no curated item could be picked.
 - `comparison` (plan §5.3) is `null` when the previous week has no analyzed entries. Otherwise the rows are:
-  - `total: {previous, current, delta, deltaPct, trend}`
-  - `categories: [{category, previous, current, delta, deltaPct, trend}]`: all three analyzed categories, in the same order as `stats`.
-  - `subcategories: [{code, category, previous, current, delta, deltaPct, trend}]`: every analyzed subcategory present in either week, ordered by code.
-  - All values are quantities (pieces). `deltaPct` is rounded to 1 decimal (half away from zero) and is `null` when `previous` is 0. `trend` is `DECREASED`, `SAME`, or `INCREASED`.
-- `impacts` (plan §5.4) lists the interventions adopted on the previous week's report, measured in this week, ordered by `targetSubcategory`, then `interventionId` (same order as `measureImpact()`). `baselineQuantity` is the value stored at adoption time. `followupQuantity` is `0` when the target wasn't logged this week.
+  - `pieces` and `grams`: `{previous, current, delta, deltaPct, trend}` for the analyzed totals of each unit.
+  - `categories: [{category, unit, previous, current, delta, deltaPct, trend}]`: one row per analyzed category and each unit that category uses in the taxonomy (Biodegradable has a `PIECES` and a `GRAMS` row), in `stats` order, then `PIECES` before `GRAMS`.
+  - `subcategories: [{code, category, unit, previous, current, delta, deltaPct, trend}]`: every analyzed subcategory present in either week, ordered by code.
+  - Every value is a quantity in the row's unit. `deltaPct` is rounded to 1 decimal (half away from zero) and is `null` when `previous` is 0. `trend` is `DECREASED`, `SAME`, or `INCREASED`.
+- `impacts` (plan §5.4) lists the interventions adopted on the previous week's report, measured in this week, ordered by `targetSubcategory`, then `interventionId` (same order as `measureImpact()`). `baselineQuantity` is the value stored at adoption time. Both quantities are in `unit`, the target subcategory's unit. `followupQuantity` is `0` when the target wasn't logged this week.
   - If nothing at all was logged the following week, there is no following report and no impact rows exist. In that case the client shows "Not measured" on the adopted cards of the earlier report once that following week has closed.
 - `revision` starts at 1 and increases each time a late offline sync regenerates the report (plan §5.6). Regeneration keeps adoptions and the recommendations of hotspots that still exist. A hotspot that is no longer in the top 3 is removed along with its recommendations, but adoptions of its interventions are kept and still measured.
 - The same rules are implemented for offline reports on Android and are pinned by `docs/analytics-test-vectors.json`.
@@ -168,7 +170,7 @@ Not for the Android app. They exist only when `DEV_TOOLS_ENABLED=true` and `APP_
 |---|---|---|
 | `GET /internal/dev/clock` | — | `{serverNow, overridden, currentWeekStart}` |
 | `POST /internal/dev/clock` | `{"now":"<ISO instant>"}` sets the server-wide time, which keeps ticking from there. `{}`, `{"now":null}`, or no body restores real time. | same as GET |
-| `POST /internal/dev/seed-history` | `{email, weeks = 3 (1–8), adopt = true, seed = 1}` | `{userId, weeks:[{weekStart, entries, analyzedQuantity, hotspots:[code], adopted:[interventionCode], impacts}]}`, oldest first |
+| `POST /internal/dev/seed-history` | `{email, weeks = 3 (1–8), adopt = true, seed = 1}` | `{userId, weeks:[{weekStart, entries, analyzedPieces, analyzedGrams, hotspots:[code], adopted:[interventionCode], impacts}]}`, oldest first |
 | `POST /internal/dev/reset` | `{email}` | `{userId, reportsDeleted, entriesDeleted}` |
 | `POST /internal/dev/reports/generate` | `{email, weekStart, regenerate = false}` | the full report (§3) |
 
@@ -198,7 +200,7 @@ Returned by `PUT /v1/entries/{id}`, `GET /v1/entries`, and `POST /v1/entries/syn
 
 ### 6.3 `PUT /v1/entries/{id}`
 - `{id}` must be a canonical UUID (client-generated). Otherwise `400 VALIDATION_FAILED` (`details.field = "id"`).
-- Field rules → `400 VALIDATION_FAILED` with `details.field`: `name` (trimmed, 1–60 characters), `subcategory` (a taxonomy code), `quantity` (1–999), `source` (`MANUAL` | `PHOTO`), `createdAt` (ISO-8601 instant). A wrong JSON type also returns `400`, without `details.field`.
+- Field rules → `400 VALIDATION_FAILED` with `details.field`: `name` (trimmed, 1–60 characters), `subcategory` (a taxonomy code), `quantity` (1–999 pieces, or 1–10,000 g for subcategories in grams; §8), `source` (`MANUAL` | `PHOTO`), `createdAt` (ISO-8601 instant). A wrong JSON type also returns `400`, without `details.field`.
 - **Create** (id not seen before): `createdAt` more than 5 minutes ahead of the server → `422 INVALID_TIMESTAMP` (`details.reason = "FUTURE"`). More than 14 days old → `422 INVALID_TIMESTAMP` (`details.reason = "TOO_OLD"`). A create into a closed week within 14 days is accepted (`201`) and refreshes that week's report (plan §5.6).
 - **Update** (id exists for this user): `createdAt` must equal the stored value, else `400 VALIDATION_FAILED` (`details.field = "createdAt"`). If the entry's week is not the current week → `409 WEEK_CLOSED` (`details.weekStart`).
 - **Unchanged replay:** a PUT whose fields all equal the stored entry returns `200` with the entry in any week, even a closed one, so retrying a create that already succeeded is never an error.
@@ -224,9 +226,9 @@ Returned by `PUT /v1/entries/{id}`, `GET /v1/entries`, and `POST /v1/entries/syn
 
 ```json
 {
-  "format": "menosan-export", "exportVersion": 1, "exportedAt": "…", "timezone": "Asia/Manila",
+  "format": "menosan-export", "exportVersion": 2, "exportedAt": "…", "timezone": "Asia/Manila",
   "profile": {"id", "email", "displayName", "createdAt", "consentedAt"},
-  "entries": [{"id", "name", "category", "subcategory", "quantity", "source", "createdAt", "weekStart", "updatedAt", "receivedAt"}],
+  "entries": [{"id", "name", "category", "subcategory", "quantity", "unit", "source", "createdAt", "weekStart", "updatedAt", "receivedAt"}],
   "reports": [{
     "weekStart", "weekEnd", "revision", "algorithmVersion", "generatedAt", "regeneratedAt",
     "stats": {…}, "comparison": {…} | null,
@@ -253,11 +255,11 @@ Additive only. They're also logged in `docs/DECISIONS.md`.
 - Response `200`:
 
 ```json
-{"suggestion": {"name": "Coffee 3-in-1 sachet", "category": "RESIDUAL", "subcategory": "RES_SACHETS", "quantity": 5, "confidence": 0.82},
+{"suggestion": {"name": "Coffee 3-in-1 sachet", "category": "RESIDUAL", "subcategory": "RES_SACHETS", "quantity": 5, "unit": "PIECES", "confidence": 0.82},
  "warning": "This is an AI suggestion and it can be wrong. Please check the name, category, subcategory, and quantity before saving."}
 ```
 
-  - `name` is 1–60 characters, `subcategory` is a taxonomy code (Special codes included), `category` always matches it, `quantity` is 1–999, and `confidence` is 0–1. So the suggestion always passes `PUT /v1/entries/{id}` validation unchanged (with `source = "PHOTO"`).
+  - `name` is 1–60 characters, `subcategory` is a taxonomy code (Special codes included), `category` always matches it, `quantity` is in `unit` (the subcategory's unit: 1–999 pieces, or 1–10,000 g estimated from the photo for food), and `confidence` is 0–1. So the suggestion always passes `PUT /v1/entries/{id}` validation unchanged (with `source = "PHOTO"`).
   - `warning` is always present (SFR9.5). Show it next to the review form.
 - Errors (`error.details` in brackets):
   - `400 VALIDATION_FAILED` (`{"field":"image"}`): no `image` part, an empty file, a file that isn't a JPEG, or a malformed multipart body.
@@ -267,3 +269,20 @@ Additive only. They're also logged in `docs/DECISIONS.md`.
   - `422 ANALYSIS_FAILED`: Gemini failed, timed out (15 s), or returned something that didn't pass validation. Retrying with the same or a clearer photo is fine. Manual logging always works.
   - `429 RATE_LIMITED` (`{"limit":30,"resetsAt":"2026-09-30T16:00:00Z"}`): 30 analyses per user per Manila calendar day. `resetsAt` is the next Manila midnight. Every analysis that reaches Gemini counts, including `NOT_WASTE` and `ANALYSIS_FAILED`. Rejected uploads (400/413/415) don't count.
 - Nothing is stored: the image is held in memory for the Gemini call only and is never logged.
+
+## 8. Quantity units (2026-09-27, taxonomy version 2, `ALGORITHM_VERSION` 2)
+
+Breaking change approved by the team on 2026-09-27 (plan §8.4). Staging data was reset by migration `V4` because food entries had been counted in pieces.
+
+- Every subcategory has a fixed `unit` in `taxonomy.json` and `GET /v1/taxonomy`: `GRAMS` for `BIO_FOOD_LEFTOVERS`, `BIO_SPOILED_FOOD`, and `BIO_PEELS_SCRAPS`, and `PIECES` for everything else (Special included).
+- An entry's `quantity` is in its subcategory's unit. Requests don't send a unit: the server derives it, as it does `category`. Limits: 1–999 pieces, or 1–10,000 g. Changing an entry's subcategory to one with another unit changes what its `quantity` means, so the app asks for the quantity again.
+- Pieces and grams are never added together:
+  - `stats.analyzedTotals`, `stats.categories[]`, and `stats.special` hold `frequency`, `pieces`, and `grams`.
+  - Category `sharePct` is by entries.
+  - Hotspots: `score = 0.5·f/maxF + 0.5·q/maxQ(unit)`, where `maxQ(unit)` is the largest quantity among this week's subcategories of the same unit. `HIGHEST_QUANTITY` goes to the largest subcategory of each unit, so a week can have one for pieces and one for grams. Order: score desc, then `q/maxQ(unit)` desc, then frequency desc, then code.
+  - `comparison.total` was replaced by `comparison.pieces` and `comparison.grams`. Category rows are per unit.
+  - Hotspots, subcategory rows, and impacts carry `unit`.
+- `GET /v1/reports` rows: `analyzedQuantity` was replaced by `analyzedEntries`, `analyzedPieces`, and `analyzedGrams`.
+- `POST /v1/photo-analysis` returns `suggestion.unit`. For food it estimates grams from the photo.
+- `GET /v1/export` is `exportVersion` 2 and entries carry `unit`.
+- `docs/analytics-test-vectors.json` (algorithmVersion 2, taxonomyVersion 2) pins these rules for Android's offline reports.

@@ -54,7 +54,7 @@ class DevApp(
 
     private val entries = ExposedEntryRepository(db)
     private val engine = LibraryInterventionEngine(ExposedInterventionRepository(db), StubGeminiClient, taxonomy)
-    private val reports = DefaultReportService(ReportStore(db), clock, taxonomy, engine)
+    private val reports = DefaultReportService(ReportStore(db, taxonomy), clock, taxonomy, engine)
 
     val deps = AppDeps(
         config = AppConfig.from(

@@ -1,5 +1,6 @@
 package app.menosan.interventions
 
+import app.menosan.analytics.QuantityUnit
 import java.util.UUID
 
 /** One hotspot to recommend for (§5.2 output). */
@@ -7,7 +8,9 @@ data class HotspotInput(
     val subcategoryCode: String,
     val criteria: List<String>, // MOST_FREQUENT, HIGHEST_QUANTITY, AVOIDABLE
     val frequency: Int,
+    /** In [unit]. */
     val quantity: Int,
+    val unit: QuantityUnit = QuantityUnit.PIECES,
 )
 
 /** An intervention adopted on last week's report and how it went (§6.2, I8). */
@@ -20,7 +23,8 @@ data class PreviousAdoption(
 
 data class RecommendationInput(
     val hotspot: HotspotInput,
-    val analyzedTotalQuantity: Int,
+    /** Analyzed entries this week (pieces and grams can't be added, so shares use entry counts). */
+    val analyzedEntries: Int,
     val previousAdoptions: List<PreviousAdoption>,
 )
 

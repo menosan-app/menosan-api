@@ -1,5 +1,6 @@
 package app.menosan.photo
 
+import app.menosan.analytics.QuantityUnit
 import app.menosan.common.notImplemented
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -10,7 +11,9 @@ data class PhotoSuggestion(
     val name: String,
     val category: String,
     val subcategory: String,
+    /** In [unit], the unit of the subcategory. */
     val quantity: Int,
+    val unit: QuantityUnit,
     val confidence: Double,
 )
 

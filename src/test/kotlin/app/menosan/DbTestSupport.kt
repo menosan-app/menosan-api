@@ -94,11 +94,12 @@ class DbTestEnv(val clock: Clock = fixedClock(DB_TEST_NOW)) {
     val reports = RecordingReportService()
     val firebase = FakeFirebaseUsers()
     val db = PostgresTestDb.db
+    val taxonomy: Taxonomy = Taxonomy.loadDefault()
 
     val deps = AppDeps(
         config = testConfig,
         clock = clock,
-        taxonomy = Taxonomy.loadDefault(),
+        taxonomy = taxonomy,
         dbHealth = DbHealthCheck { true },
         tokenVerifier = FakeTokenVerifier(
             mapOf(
@@ -111,7 +112,7 @@ class DbTestEnv(val clock: Clock = fixedClock(DB_TEST_NOW)) {
         entries = ExposedEntryRepository(db),
         reports = reports,
         accountDeletion = AccountDeletionService(db, firebase),
-        exporter = ExposedDataExporter(db, clock),
+        exporter = ExposedDataExporter(db, clock, taxonomy),
     )
 }
 

@@ -2,7 +2,7 @@
 
 > **Audience:** the AI coding agents (and humans) building Menosan.
 > **Scope:** two repositories — `menosan-api` (Kotlin + Ktor backend) and `menosan-android` (Kotlin + Jetpack Compose app).
-> **Status:** v1.2 — 2026-09-23 (offline provisional reports with comparison and impact, I12 / §5.7). This file is the working source of truth during development. Where it differs from the SRS/SDP, **this plan wins**; the team will update the SRS/SDP after release to match what was actually built (see §2.2).
+> **Status:** v1.3 — 2026-09-27 (food subcategories logged in grams, I11 / §3 / §5; earlier: v1.2 offline provisional reports, I12 / §5.7). This file is the working source of truth during development. Where it differs from the SRS/SDP, **this plan wins**; the team will update the SRS/SDP after release to match what was actually built (see §2.2).
 > **Put a copy of this file at `docs/DEVELOPMENT_PLAN.md` in both repositories.**
 
 ---
@@ -69,7 +69,7 @@ Privacy is a product feature: all data is private to the account, there are no r
 | I8 | "Takes into account interventions adopted in the previous week" (User Flow 3c) | The engine receives last week's adoptions and their impact. Improved → suggest continuing plus a next step. Same or increased → prefer different, lower-effort, lower-cost options. Adopted interventions are never silently dropped. |
 | I9 | Data export (NFR16) | `GET /v1/export` returns JSON. The app saves it with the Storage Access Framework. |
 | I10 | Late offline sync (SFR6.4) | Entries created offline are accepted into their original (possibly closed) week if `createdAt` is within the last 14 days. The affected week's report and the next week's report are regenerated (§5.6). |
-| I11 | Quantity | Positive whole number of pieces, 1–999 (SFR5.1). |
+| I11 | Quantity | Positive whole number in the subcategory's unit (SFR5.1): pieces 1–999, or grams 1–10,000 for the food subcategories `BIO_FOOD_LEFTOVERS`, `BIO_SPOILED_FOOD`, `BIO_PEELS_SCRAPS` (team decision 2026-09-27, taxonomy v2). Pieces and grams are never added together (§5). |
 | I12 | Reports when offline (team decision 2026-09-23) | If the week has closed and the server report isn't available because the device is offline, the app generates a **provisional report on the device** from locally stored data. It includes the week totals (category and subcategory, with the Special line), the **hotspots**, and, **when the data is available locally**, the week-over-week comparison, the impact of interventions adopted on the previous report, and a recap of the previous week's report (its hotspots and adopted interventions). **New intervention recommendations and adoption are online-only.** The server report replaces the local one as soon as the device is online and pending entries have synced. See §5.7. |
 
 ---
@@ -77,6 +77,8 @@ Privacy is a product feature: all data is private to the account, there are no r
 ## 3. Waste taxonomy (single source of truth)
 
 Stored in `menosan-api/src/main/resources/taxonomy.json`, seeded into the `waste_subcategories` table by migration, served by `GET /v1/taxonomy`, and **bundled as an identical copy** in `menosan-android/app/src/main/assets/taxonomy.json` for offline use. Codes are stable identifiers and must never be renamed. Labels may change.
+
+**Units (taxonomy v2, 2026-09-27):** `BIO_FOOD_LEFTOVERS`, `BIO_SPOILED_FOOD`, and `BIO_PEELS_SCRAPS` are logged in **grams**; every other subcategory in **pieces**. Each subcategory in `taxonomy.json` carries `"unit": "GRAMS" | "PIECES"`.
 
 | Code | Main category | Label | Examples (used in Gemini prompt & UI hints) | Avoidable |
 |---|---|---|---|---|
@@ -150,26 +152,28 @@ Implemented as **pure functions** in `menosan-api` package `app.menosan.analytic
 
 For a user and a closed week W, take all entries with `week_start = W`.
 
-- Per **subcategory**: `frequency` = number of entries, `quantity` = sum of pieces.
-- Per **main category** (BIODEGRADABLE, RECYCLABLE, RESIDUAL): sum of frequency and quantity over its subcategories, plus `share = quantity / analyzedTotalQuantity`, rounded to 1 decimal percent.
-- `analyzedTotals` = totals over the three main categories only.
-- `special` = frequency and quantity over SPECIAL, reported separately and **excluded** from everything else.
+- Every subcategory has a fixed `unit` (`PIECES`, or `GRAMS` for food; §3, I11). Quantities are only added or compared within one unit (`ALGORITHM_VERSION` 2).
+- Per **subcategory**: `frequency` = number of entries, `quantity` = sum of quantities in its unit.
+- Per **main category** (BIODEGRADABLE, RECYCLABLE, RESIDUAL): sum of frequency, `pieces`, and `grams` over its subcategories, plus `share = frequency / analyzedTotalFrequency` (share of entries), rounded to 1 decimal percent.
+- `analyzedTotals` = frequency, pieces, and grams over the three main categories only.
+- `special` = frequency and quantities over SPECIAL, reported separately and **excluded** from everything else.
 
 ### 5.2 Hotspot identification (SFR13.1, SFR13.2)
 
 Candidates are the non-SPECIAL subcategories with at least 1 entry in W.
 
 ```
-maxF = max frequency, maxQ = max quantity over candidates
-score(s) = 0.5 * f(s)/maxF + 0.5 * q(s)/maxQ        // round to 4 decimals
+maxF = max frequency over candidates
+maxQ(u) = max quantity over candidates whose unit is u   // per unit: grams never outweigh pieces
+score(s) = 0.5 * f(s)/maxF + 0.5 * q(s)/maxQ(unit(s))   // round to 4 decimals
 
 MOST_FREQUENT    : every s with f(s) == maxF
-HIGHEST_QUANTITY : every s with q(s) == maxQ
+HIGHEST_QUANTITY : every s with q(s) == maxQ(unit(s))   // one per unit
 TOP_AVOIDABLE    : the single avoidable s with the highest score (if any avoidable candidate exists)
 
 hotspots = MOST_FREQUENT ∪ HIGHEST_QUANTITY ∪ TOP_AVOIDABLE
-criteria(s) = { MOST_FREQUENT if f==maxF, HIGHEST_QUANTITY if q==maxQ, AVOIDABLE if s.avoidable }
-order by: score desc, q desc, f desc, code asc      // total, deterministic ordering
+criteria(s) = { MOST_FREQUENT if f==maxF, HIGHEST_QUANTITY if q==maxQ(unit), AVOIDABLE if s.avoidable }
+order by: score desc, q/maxQ(unit) desc, f desc, code asc      // total, deterministic ordering
 keep the first 3 → rank 1..3
 ```
 
@@ -179,7 +183,7 @@ keep the first 3 → rank 1..3
 
 ### 5.3 Week-over-week comparison (SFR14.1–14.3)
 
-If the immediately preceding week W−1 has at least 1 analyzed entry, compare W against W−1 for the analyzed total, each main category, and each subcategory present in either week. Each row holds `previous`, `current`, `delta = current − previous`, `deltaPct` (null when previous = 0), and `trend ∈ {DECREASED, SAME, INCREASED}`. If W−1 has no analyzed data, set `comparison = null` and the UI shows "No comparison — there is no data for the previous week." Only W−1 is ever used as a baseline.
+If the immediately preceding week W−1 has at least 1 analyzed entry, compare W against W−1 for the analyzed pieces total and grams total, each main category and unit it uses (Biodegradable has a pieces row and a grams row), and each subcategory present in either week (in its unit). Each row holds `previous`, `current`, `delta = current − previous`, `deltaPct` (null when previous = 0), and `trend ∈ {DECREASED, SAME, INCREASED}`. If W−1 has no analyzed data, set `comparison = null` and the UI shows "No comparison — there is no data for the previous week." Only W−1 is ever used as a baseline.
 
 ### 5.4 Intervention impact (SFR16.2, SFR17.1–17.2)
 
@@ -514,7 +518,7 @@ Migrations: `V2__seed_taxonomy.sql` (from `taxonomy.json`) and `V3__seed_interve
 | `DELETE /v1/entries/{id}` | Returns `204`, also when the entry is already gone (idempotent). `409 WEEK_CLOSED` if the entry's week is closed. | SFR11.2–11.3 |
 | `POST /v1/entries/sync` | Batch for the offline outbox: `{upserts:[EntryPut & {id}], deletes:[id]}` → `{results:[{id, status:"OK"|"WEEK_CLOSED"|"INVALID"|..., entry?}]}`. Items are processed independently, and the batch never fails as a whole because of one item. | SFR6.3–6.4, NFR8 |
 | `POST /v1/photo-analysis` | `multipart/form-data`, field `image` (JPEG, ≤ 2 MB). Returns `200 {suggestion:{name, category, subcategory, quantity, confidence}, warning}`. Also `422 ANALYSIS_FAILED`, `422 NOT_WASTE`, `413 IMAGE_TOO_LARGE`, `429 RATE_LIMITED` (30 per user per day). Nothing is stored. | SFR7–8, SFR9.5 |
-| `GET /v1/reports` | List `[ {weekStart, weekEnd, analyzedQuantity, hotspotCount, adoptedCount, isLatest} ]`, newest first. Runs lazy catch-up first. | SFR12.1, SFR18.2 |
+| `GET /v1/reports` | List `[ {weekStart, weekEnd, analyzedEntries, analyzedPieces, analyzedGrams, hotspotCount, adoptedCount, isLatest} ]`, newest first. Runs lazy catch-up first. | SFR12.1, SFR18.2 |
 | `GET /v1/reports/{weekStart}` | Full report (§8.3). | SFR12–17 |
 | `POST /v1/reports/{weekStart}/adoptions` | `{interventionIds:[uuid]}` → the updated report. `409 ADOPTION_WINDOW_CLOSED` if the report is not the latest. | SFR16 |
 | `DELETE /v1/reports/{weekStart}/adoptions/{interventionId}` | Un-adopt within the window. | SFR16 |

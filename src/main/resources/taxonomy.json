@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "timezone": "Asia/Manila",
   "categories": [
     {
@@ -34,6 +34,7 @@
         "plate waste"
       ],
       "avoidable": true,
+      "unit": "GRAMS",
       "sortOrder": 1
     },
     {
@@ -46,6 +47,7 @@
         "sour milk"
       ],
       "avoidable": true,
+      "unit": "GRAMS",
       "sortOrder": 2
     },
     {
@@ -59,6 +61,7 @@
         "eggshells"
       ],
       "avoidable": false,
+      "unit": "GRAMS",
       "sortOrder": 3
     },
     {
@@ -71,6 +74,7 @@
         "twigs"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 4
     },
     {
@@ -82,6 +86,7 @@
         "other biodegradable"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 5
     },
     {
@@ -94,6 +99,7 @@
         "juice bottle"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 1
     },
     {
@@ -106,6 +112,7 @@
         "food tub"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 2
     },
     {
@@ -119,6 +126,7 @@
         "newspapers"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 3
     },
     {
@@ -130,6 +138,7 @@
         "sauce jar"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 4
     },
     {
@@ -142,6 +151,7 @@
         "softdrink can"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 5
     },
     {
@@ -152,6 +162,7 @@
         "other recyclable"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 6
     },
     {
@@ -165,6 +176,7 @@
         "detergent sachet"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 1
     },
     {
@@ -177,6 +189,7 @@
         "ice bag"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 2
     },
     {
@@ -189,6 +202,7 @@
         "candy wrapper"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 3
     },
     {
@@ -201,6 +215,7 @@
         "takeout cup"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 4
     },
     {
@@ -213,6 +228,7 @@
         "plastic cup"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 5
     },
     {
@@ -225,6 +241,7 @@
         "wet wipes"
       ],
       "avoidable": true,
+      "unit": "PIECES",
       "sortOrder": 6
     },
     {
@@ -236,6 +253,7 @@
         "sanitary pad"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 7
     },
     {
@@ -246,6 +264,7 @@
         "other residual"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 8
     },
     {
@@ -257,6 +276,7 @@
         "button cell"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 1
     },
     {
@@ -269,6 +289,7 @@
         "old phone"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 2
     },
     {
@@ -280,6 +301,7 @@
         "light bulb"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 3
     },
     {
@@ -292,6 +314,7 @@
         "used mask"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 4
     },
     {
@@ -304,6 +327,7 @@
         "aerosol can"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 5
     },
     {
@@ -314,6 +338,7 @@
         "other special waste"
       ],
       "avoidable": false,
+      "unit": "PIECES",
       "sortOrder": 6
     }
   ]

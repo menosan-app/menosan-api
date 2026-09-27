@@ -41,6 +41,16 @@ class DatabaseIntegrationTest {
     }
 
     @Test
+    fun `V4 stores the unit of every subcategory as in taxonomy json`() = runBlocking {
+        val units = db.tx {
+            exec("SELECT code, unit FROM waste_subcategories") { rs ->
+                buildMap { while (rs.next()) put(rs.getString(1), rs.getString(2)) }
+            }.orEmpty()
+        }
+        assertEquals(Taxonomy.loadDefault().subcategories.associate { it.code to it.unit.name }, units)
+    }
+
+    @Test
     fun `health check succeeds`() = runBlocking {
         assertTrue(JdbcHealthCheck(PostgresTestDb.dataSource).isHealthy())
     }
