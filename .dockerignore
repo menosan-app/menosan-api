@@ -1,0 +1,11 @@
+.git
+.gradle
+.kotlin
+.idea
+build
+out
+*.md
+.env
+.env.*
+*.jks
+*service-account*.json
