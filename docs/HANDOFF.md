@@ -4,6 +4,76 @@ Newest entry first. Use `docs/HANDOFF_TEMPLATE.md` for each entry. Every agent *
 
 ---
 
+# Handoff — menosan-api — 2026-09-27 (food waste in grams, analytics v2)
+
+## 1. Session
+- **Agent / model:** Claude Code (Claude Opus 5.5)
+- **Workstream(s):** BE-1/BE-2/BE-3/BE-4: quantity units, a team request that came with the Android UI feedback.
+- **Branch:** `main`, `b2485bb` **pushed**; staging redeploys from it (see §5).
+- **Overall state:** 🟢 216 tests pass, 4 skipped (env-gated). `buildFatJar` OK.
+
+## 2. Done this session
+- [x] **Team decisions (2026-09-27):**
+  - Food subcategories (`BIO_FOOD_LEFTOVERS`, `BIO_SPOILED_FOOD`, `BIO_PEELS_SCRAPS`) are logged in **grams**; everything else stays in pieces.
+  - The unit is fixed per subcategory.
+  - Per-unit totals.
+  - Reset staging data.
+  - Deploy staging.
+
+  This is a breaking contract change, approved by the team (plan §8.4). Android was updated in the same change.
+- [x] `taxonomy.json` v2 with `unit` on every subcategory, and `Taxonomy.unitOf()`.
+- [x] **Analytics v2** (`ALGORITHM_VERSION` 2), pure and portable as before:
+  - totals and categories have `pieces`/`grams`, and category `sharePct` is by entries;
+  - subcategories are ordered by frequency, then code;
+  - hotspot `q/maxQ(unit)`, `HIGHEST_QUANTITY` per unit, and the tie-break by normalized quantity;
+  - comparison `pieces`/`grams` rows and per-unit category rows (`compare(…, taxonomy)`);
+  - `unit` on hotspots, subcategory rows, and impacts (`measureImpact(…, taxonomy)`).
+- [x] **Vectors:** 26 cases (5 new for units), regenerated and reviewed, and copied to Android.
+- [x] **Validation:** 1–999 pcs or 1–10,000 g. **`V4`** adds `waste_subcategories.unit`, widens the DB check to 10,000, and **deletes all `weekly_reports` and `waste_entries` once** (staging only had test data; prod doesn't exist).
+- [x] **Payloads:**
+  - the report list has `analyzedEntries`/`analyzedPieces`/`analyzedGrams`;
+  - hotspots and impacts have `unit`;
+  - photo analysis has `suggestion.unit`, and the prompt estimates grams for food;
+  - export is version 2, with `unit` on each entry;
+  - the dev seed logs food in grams.
+- [x] **Intervention prompt:** `quantityThisWeek` + `unit`, and the share of entries.
+- [x] **Docs:** contract §8 plus inline updates, the CHANGELOG line, 5 DECISIONS rows, and plan v1.3 (I11, §3, §5.1–5.3; copied to Android).
+
+## 3. In progress (unfinished)
+| Item | Where | What's left |
+|---|---|---|
+| Staging smoke test | staging | After the deploy: `GET /v1/taxonomy` → version 2, re-seed the demo account, and photograph leftover rice (a grams estimate). |
+
+## 4. Next steps (in order)
+1. Confirm the deploy (§5). `V4` runs on start and wipes staging entries and reports; accounts stay.
+2. Re-seed the demo account (`/internal/dev/seed-history`, ENVIRONMENTS §6) and open its reports in the app.
+3. Real-photo smoke test for food in grams, recorded in `docs/photo-smoke.md`.
+4. Carried over: create prod, rotate the Firebase key, a separate Gemini key for prod.
+
+## 5. Verify the current state
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+./gradlew cleanTest test buildFatJar     # 216 tests, 4 skipped
+curl -s https://menosan-api-staging.onrender.com/v1/taxonomy | grep -o '"version":[0-9]*'   # "version":2 once deployed
+```
+
+## 6. Known issues
+- An old app build (before Android `80a5d16`) can't read v2 reports. Install the new build.
+
+## 7. Decisions (also in docs/DECISIONS.md)
+- Food in grams (fixed per subcategory, 10,000 g max), analytics v2 never adds pieces to grams, the one-time `V4` reset, the Gemini selection input, and grams in photo analysis.
+
+## 8. API contract changes
+- Contract §8 and `CHANGELOG-contract.md` 2026-09-27. Breaking, approved by the team.
+
+## 9. Environment / setup notes
+- No new env vars or dependencies.
+
+## 10. Questions / blockers for humans
+- None.
+
+---
+
 # Handoff — menosan-api — 2026-09-24 03:10 PHT (Gemini free-tier throttle)
 
 ## 1. Session
