@@ -7,7 +7,7 @@ out/
 *.hprof
 .env
 .env.*
-!.env.example
+.env.example
 *.jks
 *service-account*.json
 .DS_Store
