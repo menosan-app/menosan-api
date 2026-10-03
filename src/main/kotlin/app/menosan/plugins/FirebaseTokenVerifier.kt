@@ -32,7 +32,7 @@ class FirebaseTokenVerifier(projectId: String, serviceAccountJsonB64: String) : 
     override suspend fun verify(idToken: String): VerifiedToken? = withContext(Dispatchers.IO) {
         try {
             val token = auth.verifyIdToken(idToken)
-            VerifiedToken(uid = token.uid, email = token.email, name = token.name)
+            VerifiedToken(uid = token.uid, email = token.email, emailVerified = token.isEmailVerified, name = token.name)
         } catch (e: FirebaseAuthException) {
             log.info("ID token rejected: {}", e.authErrorCode)
             null

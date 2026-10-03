@@ -14,7 +14,7 @@ import io.ktor.server.routing.RoutingResolveContext
 import io.ktor.util.AttributeKey
 import java.util.UUID
 
-class VerifiedToken(val uid: String, val email: String?, val name: String?) {
+class VerifiedToken(val uid: String, val email: String?, val emailVerified: Boolean, val name: String?) {
     override fun toString() = "VerifiedToken(uid=$uid)"
 }
 
