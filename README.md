@@ -4,7 +4,7 @@ Menosan is an Android app that helps households in Dumaguete City cut down on wa
 
 This repository is the backend service behind the app. It:
 
-- signs users in through Firebase, with their Google account or a sign-in link sent to their email
+- signs users in with their Google account through Firebase
 - stores each household's waste log, including entries saved offline and synced later
 - builds the weekly reports and finds each household's biggest sources of waste
 - suggests prevention and reuse ideas from a curated library
